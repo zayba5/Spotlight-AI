@@ -1,0 +1,55 @@
+import os
+from typing import List, Dict, Any
+from dotenv import load_dotenv
+import google.generativeai as genai
+from tenacity import retry, wait_exponential, stop_after_attempt
+
+load_dotenv()
+
+GEMINI_GENERATE_MODEL = os.getenv("GEMINI_GENERATE_MODEL", "gemini-2.5-pro")
+GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "text-embedding-004")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+if not GOOGLE_API_KEY:
+	raise RuntimeError("GOOGLE_API_KEY is not set. Please configure it in your environment.")
+
+genai.configure(api_key=GOOGLE_API_KEY)
+
+
+def get_embedding(text: str) -> List[float]:
+	if not text:
+		return []
+	resp = genai.embed_content(model=GEMINI_EMBED_MODEL, content=text)
+	return resp["embedding"]
+
+
+@retry(wait=wait_exponential(multiplier=1, min=1, max=10), stop=stop_after_attempt(3))
+def generate_response(system_prompt: str, user_prompt: str) -> str:
+	model = genai.GenerativeModel(GEMINI_GENERATE_MODEL, system_instruction=system_prompt)
+	resp = model.generate_content(user_prompt)
+	return resp.text or ""
+
+
+def build_system_prompt(preference_summary: str) -> str:
+	return (
+		"You are Spotlight-AI, a local recommendations assistant. You answer with concise, clear suggestions "
+		"based on retrieved reviews, menus, and ratings. Always include relevant citations as [n] referencing items provided. "
+		f"Personalization context: {preference_summary or 'none'}"
+	)
+
+
+def build_user_prompt(query: str, retrieved: List[Dict[str, Any]]) -> str:
+	# Format retrieved chunks with numeric indices for citations
+	lines = ["User question: " + query, "", "Retrieved context:"]
+	for i, item in enumerate(retrieved, start=1):
+		title = item.get("metadata", {}).get("title") or item.get("metadata", {}).get("name") or "Source"
+		url = item.get("metadata", {}).get("url") or ""
+		snippet = item.get("document", "")[:1200]
+		lines.append(f"[{i}] {title} {url}\n{snippet}")
+	lines.append("")
+	lines.append("Instructions: Provide top 3-5 recommendations if applicable. Use citations like [1], [2]. "
+				 "Prioritize user's preferences. Be specific about quietness, vegetarian, budget, and distance when available.")
+	return "\n".join(lines)
+
+
+
