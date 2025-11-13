@@ -1,294 +1,253 @@
 import streamlit as st
-import hashlib
-import json
 from datetime import datetime
 
 # Page config
 st.set_page_config(
-    page_title="Spotlight AI - Sign In",
-    page_icon="🔦",
-    layout="centered"
+    page_title="Spotlight AI - Profile",
+    page_icon="👤",
+    layout="wide"
 )
 
 # Custom CSS
 st.markdown("""
 <style>
-    .main {
+    .profile-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-    .auth-container {
-        background: white;
         padding: 3rem;
-        border-radius: 20px;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        max-width: 450px;
-        margin: 2rem auto;
-    }
-    .logo-text {
-        font-size: 3rem;
-        font-weight: bold;
-        text-align: center;
-        margin-bottom: 0.5rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-    .subtitle {
-        text-align: center;
-        color: #666;
-        margin-bottom: 2rem;
-        font-size: 1.1rem;
-    }
-    .stButton>button {
-        width: 100%;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 15px;
         color: white;
-        border: none;
-        padding: 0.75rem;
-        font-size: 1.1rem;
-        font-weight: bold;
-        border-radius: 10px;
-        margin-top: 1rem;
-    }
-    .stButton>button:hover {
-        background: linear-gradient(135deg, #5568d3 0%, #6a4193 100%);
-    }
-    .stTextInput>div>div>input {
-        border-radius: 10px;
-        padding: 0.75rem;
-        font-size: 1rem;
-    }
-    .divider {
+        margin-bottom: 2rem;
         text-align: center;
-        margin: 2rem 0;
-        color: #999;
     }
-    .social-btn {
-        width: 100%;
-        padding: 0.75rem;
-        margin: 0.5rem 0;
+    .stat-card {
+        background: #f8f9fa;
+        padding: 1.5rem;
         border-radius: 10px;
-        border: 2px solid #ddd;
-        background: white;
-        cursor: pointer;
-        font-size: 1rem;
-        font-weight: 500;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        text-align: center;
+        border: 2px solid #e9ecef;
     }
-    .feature-badge {
-        background: #f0f0f0;
-        padding: 0.5rem 1rem;
-        border-radius: 20px;
-        margin: 0.25rem;
-        display: inline-block;
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #667eea;
+    }
+    .stat-label {
+        color: #6c757d;
         font-size: 0.9rem;
+        margin-top: 0.5rem;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # Initialize session state
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
 if 'user_data' not in st.session_state:
-    st.session_state.user_data = None
-if 'show_signup' not in st.session_state:
-    st.session_state.show_signup = False
-
-# Mock user database (in production, use real database)
-# Format: {email: {password_hash, name, created_at}}
-if 'users_db' not in st.session_state:
-    st.session_state.users_db = {
-        # Demo user: email=demo@spotlight.ai, password=demo123
-        'demo@spotlight.ai': {
-            'password_hash': hashlib.sha256('demo123'.encode()).hexdigest(),
-            'name': 'Demo User',
-            'created_at': '2024-01-01'
-        }
+    st.session_state.user_data = {'email': 'demo@spotlight.ai', 'name': 'Demo User'}
+if 'user_preferences' not in st.session_state:
+    st.session_state.user_preferences = {
+        'dietary': [],
+        'price_range': [1, 4],
+        'noise_preference': 'Any',
+        'cuisine_preferences': [],
+        'location': 'San Jose, CA',
+        'liked_places': [],
+        'search_history': []
     }
 
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+# Profile Header
+st.markdown(f"""
+<div class="profile-header">
+    <div style="font-size: 4rem; margin-bottom: 1rem;">👤</div>
+    <h1 style="margin: 0;">{st.session_state.user_data['name']}</h1>
+    <p style="font-size: 1.1rem; margin: 0.5rem 0;">✉️ {st.session_state.user_data['email']}</p>
+    <p style="opacity: 0.9;">📅 Member since January 2024</p>
+</div>
+""", unsafe_allow_html=True)
 
-def verify_login(email, password):
-    if email in st.session_state.users_db:
-        stored_hash = st.session_state.users_db[email]['password_hash']
-        if hash_password(password) == stored_hash:
-            return True, st.session_state.users_db[email]
-    return False, None
+# Stats Overview
+st.markdown("## 📊 Your Activity at a Glance")
+col1, col2, col3, col4 = st.columns(4)
 
-def create_account(email, password, name):
-    if email in st.session_state.users_db:
-        return False, "Account already exists"
-    
-    st.session_state.users_db[email] = {
-        'password_hash': hash_password(password),
-        'name': name,
-        'created_at': datetime.now().strftime('%Y-%m-%d')
-    }
-    return True, "Account created successfully"
+with col1:
+    st.markdown(f"""
+    <div class="stat-card">
+        <div class="stat-number">{len(st.session_state.user_preferences.get('search_history', []))}</div>
+        <div class="stat-label">Total Searches</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-# Main content
-if not st.session_state.authenticated:
-    # Branding header
-    st.markdown('<div class="logo-text">🔦 Spotlight AI</div>', unsafe_allow_html=True)
-    st.markdown('<div class="subtitle">Your Personal Local Search Assistant</div>', unsafe_allow_html=True)
-    
-    # Features preview
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown('<div class="feature-badge">🤖 AI-Powered</div>', unsafe_allow_html=True)
-    with col2:
-        st.markdown('<div class="feature-badge">🎯 Personalized</div>', unsafe_allow_html=True)
-    with col3:
-        st.markdown('<div class="feature-badge">📍 Real-Time</div>', unsafe_allow_html=True)
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # Toggle between Sign In and Sign Up
-    tab1, tab2 = st.tabs(["🔑 Sign In", "✨ Sign Up"])
-    
-    with tab1:
-        st.markdown("### Welcome Back!")
-        
-        with st.form("signin_form"):
-            email = st.text_input("Email", placeholder="your.email@example.com")
-            password = st.text_input("Password", type="password", placeholder="Enter your password")
-            
-            col1, col2 = st.columns([3, 2])
-            with col1:
-                remember_me = st.checkbox("Remember me")
-            with col2:
-                st.markdown("[Forgot password?](#)")
-            
-            submit = st.form_submit_button("Sign In")
-            
-            if submit:
-                if not email or not password:
-                    st.error("Please fill in all fields")
-                else:
-                    success, user_data = verify_login(email, password)
-                    if success:
-                        st.session_state.authenticated = True
-                        st.session_state.user_data = {
-                            'email': email,
-                            'name': user_data['name']
-                        }
-                        st.success(f"Welcome back, {user_data['name']}! 🎉")
-                        st.balloons()
-                        # Give user time to see success message
-                        st.markdown("Redirecting to app...")
-                        st.rerun()
-                    else:
-                        st.error("Invalid email or password")
-        
-        st.markdown('<div class="divider">OR</div>', unsafe_allow_html=True)
-        
-        # Social login buttons
-        if st.button("🔍 Continue with Google", key="google_signin"):
-            st.info("Google OAuth integration coming soon!")
-        
-        if st.button("📘 Continue with Facebook", key="fb_signin"):
-            st.info("Facebook OAuth integration coming soon!")
-        
-        # Demo account info
-        st.info("💡 **Try it now!** Use demo@spotlight.ai / demo123")
-    
-    with tab2:
-        st.markdown("### Create Your Account")
-        
-        with st.form("signup_form"):
-            name = st.text_input("Full Name", placeholder="John Doe")
-            email = st.text_input("Email", placeholder="your.email@example.com", key="signup_email")
-            password = st.text_input("Password", type="password", placeholder="Create a strong password", key="signup_pass")
-            confirm_password = st.text_input("Confirm Password", type="password", placeholder="Re-enter password")
-            
-            agree = st.checkbox("I agree to the Terms of Service and Privacy Policy")
-            
-            submit = st.form_submit_button("Create Account")
-            
-            if submit:
-                if not name or not email or not password or not confirm_password:
-                    st.error("Please fill in all fields")
-                elif password != confirm_password:
-                    st.error("Passwords don't match")
-                elif len(password) < 6:
-                    st.error("Password must be at least 6 characters")
-                elif not agree:
-                    st.error("Please agree to the Terms of Service")
-                else:
-                    success, message = create_account(email, password, name)
-                    if success:
-                        st.success(f"{message} 🎉")
-                        st.info("Please sign in with your new account")
-                    else:
-                        st.error(message)
-        
-        st.markdown('<div class="divider">OR</div>', unsafe_allow_html=True)
-        
-        # Social signup buttons
-        if st.button("🔍 Sign up with Google", key="google_signup"):
-            st.info("Google OAuth integration coming soon!")
-        
-        if st.button("📘 Sign up with Facebook", key="fb_signup"):
-            st.info("Facebook OAuth integration coming soon!")
+with col2:
+    st.markdown(f"""
+    <div class="stat-card">
+        <div class="stat-number">{len(st.session_state.user_preferences.get('liked_places', []))}</div>
+        <div class="stat-label">Saved Places</div>
+    </div>
+    """, unsafe_allow_html=True)
 
+with col3:
+    st.markdown(f"""
+    <div class="stat-card">
+        <div class="stat-number">{len(st.session_state.user_preferences.get('dietary', []))}</div>
+        <div class="stat-label">Dietary Preferences</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col4:
+    st.markdown(f"""
+    <div class="stat-card">
+        <div class="stat-number">{len(st.session_state.user_preferences.get('cuisine_preferences', []))}</div>
+        <div class="stat-label">Favorite Cuisines</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.divider()
+
+# Account Information
+st.markdown("## 👤 Account Information")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    name = st.text_input("Full Name", value=st.session_state.user_data['name'])
+    email = st.text_input("Email Address", value=st.session_state.user_data['email'])
+
+with col2:
+    st.text_input("Password", value="••••••••", type="password", disabled=True)
+    if st.button("Change Password"):
+        st.info("Password change functionality coming soon!")
+
+st.divider()
+
+# Current Preferences Summary
+st.markdown("## ⚙️ Current Preferences")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("### 🥗 Dietary Preferences")
+    dietary = st.session_state.user_preferences.get('dietary', [])
+    if dietary:
+        for pref in dietary:
+            st.markdown(f"✅ {pref}")
+    else:
+        st.info("No dietary restrictions set")
+    
+    st.markdown("### 💰 Price Range")
+    price_range = st.session_state.user_preferences.get('price_range', [1, 4])
+    if isinstance(price_range, tuple) or isinstance(price_range, list):
+        if len(price_range) == 2 and isinstance(price_range[0], str):
+            st.markdown(f"**{price_range[0]} to {price_range[1]}**")
+        else:
+            st.markdown(f"**{'$' * price_range[0]} to {'$' * price_range[1]}**")
+    else:
+        st.markdown("**$ to $$$$**")
+
+with col2:
+    st.markdown("### 🔊 Atmosphere")
+    noise = st.session_state.user_preferences.get('noise_preference', 'Any')
+    st.markdown(f"**{noise}**")
+    
+    st.markdown("### 📍 Default Location")
+    location = st.session_state.user_preferences.get('location', 'San Jose, CA')
+    st.markdown(f"**{location}**")
+
+st.info("💡 **Tip:** Update your preferences in the sidebar on the main chat page!")
+
+st.divider()
+
+# Favorite Cuisines
+st.markdown("## 🍜 Favorite Cuisines")
+cuisines = st.session_state.user_preferences.get('cuisine_preferences', [])
+if cuisines:
+    cols = st.columns(4)
+    for idx, cuisine in enumerate(cuisines):
+        with cols[idx % 4]:
+            st.markdown(f"🍽️ {cuisine}")
 else:
-    # User is authenticated - show main app
-    st.markdown(f"# Welcome, {st.session_state.user_data['name']}! 👋")
-    st.success("You're successfully signed in!")
+    st.info("No cuisine preferences set yet. We'll learn as you explore!")
+
+st.divider()
+
+# Recent Activity
+st.markdown("## 📅 Recent Activity")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("### 🔍 Recent Searches")
+    recent_searches = st.session_state.user_preferences.get('search_history', [])[-5:]
+    if recent_searches:
+        for search in recent_searches:
+            st.markdown(f"- {search.get('query', 'Unknown query')}")
+    else:
+        st.info("No recent searches")
+
+with col2:
+    st.markdown("### ❤️ Recently Saved")
+    recent_saved = st.session_state.user_preferences.get('liked_places', [])[-5:]
+    if recent_saved:
+        for place in recent_saved:
+            st.markdown(f"- {place}")
+    else:
+        st.info("No saved places yet")
+
+st.divider()
+
+# Account Actions
+st.markdown("## ⚡ Quick Actions")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    if st.button("🔄 Update Profile", use_container_width=True, type="primary"):
+        st.session_state.user_data['name'] = name
+        st.session_state.user_data['email'] = email
+        st.success("✅ Profile updated successfully!")
+
+with col2:
+    if st.button("📥 Export My Data", use_container_width=True):
+        import json
+        data = {
+            'user_data': st.session_state.user_data,
+            'preferences': st.session_state.user_preferences
+        }
+        st.download_button(
+            "Download JSON",
+            data=json.dumps(data, indent=2),
+            file_name="spotlight_profile.json",
+            mime="application/json"
+        )
+
+with col3:
+    if st.button("🏠 Back to Chat", use_container_width=True):
+        st.switch_page("app.py")
+
+st.divider()
+
+# Danger Zone
+with st.expander("⚠️ Danger Zone"):
+    st.warning("**Warning:** These actions cannot be undone!")
     
-    st.markdown("---")
-    
-    st.markdown("""
-    ### 🎯 What would you like to do?
-    
-    - 🔍 **Search** for local restaurants and cafes
-    - ⭐ **Discover** hidden gems based on your preferences
-    - 💬 **Chat** with AI to get personalized recommendations
-    - 📍 **Explore** interactive maps of your area
-    - ❤️ **Save** your favorite places
-    """)
-    
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("🚀 Start Exploring", key="start_app"):
-            st.info("Redirecting to main app...")
-            # In production, navigate to your main app page
-            st.markdown("This would redirect to your main Spotlight AI app (Homepage.py)")
+        if st.button("🗑️ Clear All Preferences", type="secondary"):
+            if st.checkbox("I understand this will reset all my preferences"):
+                st.session_state.user_preferences = {
+                    'dietary': [],
+                    'price_range': [1, 4],
+                    'noise_preference': 'Any',
+                    'cuisine_preferences': [],
+                    'location': 'San Jose, CA',
+                    'liked_places': [],
+                    'search_history': []
+                }
+                st.warning("All preferences cleared!")
+                st.rerun()
     
     with col2:
-        if st.button("⚙️ Preferences", key="preferences"):
-            st.info("Opening preferences...")
-    
-    with col3:
-        if st.button("🚪 Sign Out", key="signout"):
-            st.session_state.authenticated = False
-            st.session_state.user_data = None
-            st.rerun()
-    
-    st.markdown("---")
-    
-    # User profile preview
-    with st.expander("👤 Your Profile"):
-        st.write(f"**Name:** {st.session_state.user_data['name']}")
-        st.write(f"**Email:** {st.session_state.user_data['email']}")
-        st.write(f"**Member Since:** {st.session_state.users_db[st.session_state.user_data['email']]['created_at']}")
-        
-        if st.button("Edit Profile"):
-            st.info("Profile editing coming soon!")
+        if st.button("❌ Delete Account", type="secondary"):
+            st.error("Account deletion is not available in demo mode")
 
 # Footer
-st.markdown("<br><br>", unsafe_allow_html=True)
-st.markdown("---")
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.markdown("[About]()")
-with col2:
-    st.markdown("[Privacy]()")
-with col3:
-    st.markdown("[Support]()")
-
-st.markdown("<p style='text-align: center; color: #999; margin-top: 2rem;'>© 2024 Spotlight AI. Built with ❤️ by Howard, Zayba, and Tiana</p>", unsafe_allow_html=True)
+st.divider()
+st.caption("🔒 Your data is private and secure. We never share your information with third parties.")
