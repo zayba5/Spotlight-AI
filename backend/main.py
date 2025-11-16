@@ -19,7 +19,7 @@ from .services.memory_service import (
 
 load_dotenv()
 
-CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./chroma_store")
+CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR")
 
 # Initialize DB schema if not exists
 Base.metadata.create_all(bind=engine)
