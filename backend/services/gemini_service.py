@@ -6,8 +6,8 @@ from tenacity import retry, wait_exponential, stop_after_attempt
 
 load_dotenv()
 
-GEMINI_GENERATE_MODEL = os.getenv("GEMINI_GENERATE_MODEL", "gemini-2.5-pro")
-GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "text-embedding-004")
+GEMINI_GENERATE_MODEL = os.getenv("GEMINI_GENERATE_MODEL")
+GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 if not GOOGLE_API_KEY:
