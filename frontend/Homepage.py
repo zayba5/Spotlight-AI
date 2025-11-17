@@ -5,7 +5,7 @@ from datetime import datetime
 # Page config
 st.set_page_config(
     page_title="Spotlight AI - Chat",
-    page_icon="🔦",
+    #page_icon="🔦",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -13,6 +13,31 @@ st.set_page_config(
 # Custom CSS
 st.markdown("""
 <style>
+    /* Sidebar styling */
+    [data-testid="stSidebar"] {
+        background-color: #f5f5f5;
+    }
+    [data-testid="stSidebar"] > div:first-child {
+        background-color: #f0f2f6;
+    }
+    /* Make sidebar headers bigger */
+    [data-testid="stSidebar"] h2 {
+        font-size: 1.5rem !important;
+        font-weight: bold;
+    }
+
+ .stButton > button {
+        background: #f44336;      /* main color */
+        color: white;             /* text */
+        border: none;
+        border-radius: 12px;
+        padding: 0.75rem 1rem;
+        font-weight: 600;
+    }
+    .stButton > button:hover {
+        background: #bc342a;
+    }
+
     .stChatMessage {
         padding: 1rem;
         border-radius: 0.5rem;
@@ -67,14 +92,26 @@ if 'user_preferences' not in st.session_state:
         'price_range': [1, 4],
         'noise_preference': 'Any',
         'cuisine_preferences': [],
-        'location': 'San Jose, CA',
+        'location': 'San Jose, CA', #default location
         'liked_places': [],
         'search_history': []
     }
 
 # Sidebar - Preferences and Filters
 with st.sidebar:
-    st.header("🎯 Your Preferences")
+    if st.button("Search & Map", use_container_width=True):
+        st.switch_page("pages/Maps.py")
+    if st.button("Profile", use_container_width=True):
+        st.switch_page("pages/Profile.py")
+    if st.button("History", use_container_width=True):
+        st.switch_page("pages/History.py")
+    if st.button("Settings", use_container_width=True):
+        st.switch_page("pages/Settings.py")
+        st.divider()
+
+    st.divider()
+
+    st.header("**Preferences:**")
     
     # Location
     st.subheader("📍 Location")
@@ -111,37 +148,12 @@ with st.sidebar:
     if st.button("Save Preferences"):
         st.success("Preferences saved!")
     
-    st.divider()
+
     
-    # Memory Display
-    st.subheader("🧠 What I Remember")
-    if st.session_state.user_preferences['liked_places']:
-        st.write("**Your favorite places:**")
-        for place in st.session_state.user_preferences['liked_places'][-3:]:
-            st.write(f"• {place}")
-    else:
-        st.info("I'll learn your preferences as we chat!")
     
-    if dietary_prefs:
-        st.write(f"**Dietary:** {', '.join(dietary_prefs)}")
     
-    if st.button("Clear Memory"):
-        st.session_state.user_preferences['liked_places'] = []
-        st.rerun()
     
-    st.divider()
-    
-    # Navigation
-    st.subheader("📱 Navigation")
-    if st.button("👤 Profile", use_container_width=True):
-        st.switch_page("pages/1_👤_Profile.py")
-    if st.button("🗺️ Search & Map", use_container_width=True):
-        st.switch_page("pages/2_🗺️_Search_Map.py")
-    if st.button("📚 History", use_container_width=True):
-        st.switch_page("pages/3_📚_History.py")
-    if st.button("ℹ️ About", use_container_width=True):
-        st.switch_page("pages/4_ℹ️_About.py")
-    
+   
    # st.divider()
     
  
@@ -159,7 +171,7 @@ if len(st.session_state.messages) == 0:
             user_query = "Best pizza near me"
             st.session_state.messages.append({"role": "user", "content": user_query})
             st.rerun()
-        if st.button("☕ Quiet coffee shops with WiFi"):
+        if st.button("☕️ Quiet coffee shops with WiFi"):
             user_query = "Quiet coffee shops with WiFi"
             st.session_state.messages.append({"role": "user", "content": user_query})
             st.rerun()
@@ -286,4 +298,4 @@ if prompt := st.chat_input("Ask me about local places..."):
 
 # Footer
 st.divider()
-st.caption("🔦 Spotlight AI • Powered by RAG + Yelp + Google Places • Built by Howard, Zayba, and Tiana")
+#st.caption("🔦 Spotlight AI • Powered by RAG + Yelp + Google Places • Built by Howard, Zayba, and Tiana")
