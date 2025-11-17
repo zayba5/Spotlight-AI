@@ -112,7 +112,7 @@ col1, col2, col3, col4 = st.columns(4)
 with col1:
     st.markdown("""
     <div class="stat-box">
-        <h2 style="color: #667eea; margin: 0;">""" + str(len(st.session_state.user_preferences.get('search_history', []))) + """</h2>
+        <h2 style="color: #f44336; margin: 0;">""" + str(len(st.session_state.user_preferences.get('search_history', []))) + """</h2>
         <p style="color: #6c757d; margin: 5px 0 0 0;">Total Searches</p>
     </div>
     """, unsafe_allow_html=True)
@@ -120,7 +120,7 @@ with col1:
 with col2:
     st.markdown("""
     <div class="stat-box">
-        <h2 style="color: #667eea; margin: 0;">""" + str(len(st.session_state.saved_places)) + """</h2>
+        <h2 style="color: #f44336; margin: 0;">""" + str(len(st.session_state.saved_places)) + """</h2>
         <p style="color: #6c757d; margin: 5px 0 0 0;">Saved Places</p>
     </div>
     """, unsafe_allow_html=True)
@@ -129,7 +129,7 @@ with col3:
     liked_count = len([f for f in st.session_state.user_preferences.get('feedback_history', []) if f['feedback'] == 'liked'])
     st.markdown("""
     <div class="stat-box">
-        <h2 style="color: #667eea; margin: 0;">""" + str(liked_count) + """</h2>
+        <h2 style="color: #f44336; margin: 0;">""" + str(liked_count) + """</h2>
         <p style="color: #6c757d; margin: 5px 0 0 0;">Places Liked</p>
     </div>
     """, unsafe_allow_html=True)
@@ -138,7 +138,7 @@ with col4:
     total_visits = sum([place['visit_count'] for place in st.session_state.saved_places])
     st.markdown("""
     <div class="stat-box">
-        <h2 style="color: #667eea; margin: 0;">""" + str(total_visits) + """</h2>
+        <h2 style="color: #f44336; margin: 0;">""" + str(total_visits) + """</h2>
         <p style="color: #6c757d; margin: 5px 0 0 0;">Total Visits</p>
     </div>
     """, unsafe_allow_html=True)
@@ -291,7 +291,7 @@ with tab4:
     st.markdown("---")
     
     # Recommendation engine (mock)
-    st.markdown("#### 💡 We think you'll love these places:")
+    st.markdown("#### 💡 Places we think you'll like:")
     
     recommendations = [
         {
@@ -341,9 +341,4 @@ with tab4:
             if st.button("❤️ Save", key=f"save_rec_{rec['name']}"):
                 st.success(f"Saved {rec['name']}!")
     
-    st.markdown("---")
-    st.info("💡 Recommendations improve as you use Spotlight AI more! Keep saving places and providing feedback.")
-
-# Footer
-st.divider()
-st.caption("🔒 Your data is private and secure. Export or delete your history anytime.")
+   
