@@ -130,55 +130,50 @@ if 'search_results' not in st.session_state:
 
 # Sidebar Filters
 with st.sidebar:
-    st.markdown("### 🎯 Filters")
+
     
-    # Distance
-    st.markdown('<div class="filter-section">', unsafe_allow_html=True)
+    st.markdown("###  Filters") 
+
+    #st.markdown('<div class="filter-section">', unsafe_allow_html=True)
     distance_radius = st.slider("📍 Distance (miles)", 0.5, 25.0, 5.0, 0.5)
-    st.markdown('</div>', unsafe_allow_html=True)
+    #st.markdown('</div>', unsafe_allow_html=True)
     
     # Price Range
-    st.markdown('<div class="filter-section">', unsafe_allow_html=True)
+    #st.markdown('<div class="filter-section">', unsafe_allow_html=True)
     price_filter = st.multiselect(
         "💰 Price Range",
         ["$", "$$", "$$$", "$$$$"],
         default=["$", "$$"]
     )
-    st.markdown('</div>', unsafe_allow_html=True)
+    #st.markdown('</div>', unsafe_allow_html=True)
     
     # Rating
-    st.markdown('<div class="filter-section">', unsafe_allow_html=True)
     min_rating = st.slider("⭐ Minimum Rating", 1.0, 5.0, 4.0, 0.5)
-    st.markdown('</div>', unsafe_allow_html=True)
     
     # Categories
-    st.markdown('<div class="filter-section">', unsafe_allow_html=True)
     categories = st.multiselect(
         "🏷️ Categories",
         ["Coffee & Tea", "Restaurants", "Cafes", "Bars", "Fast Food", "Desserts"],
         default=["Coffee & Tea"]
     )
-    st.markdown('</div>', unsafe_allow_html=True)
     
     # Open Now
-    st.markdown('<div class="filter-section">', unsafe_allow_html=True)
     open_now = st.checkbox("🕐 Open Now", value=True)
-    st.markdown('</div>', unsafe_allow_html=True)
     
     # Sort By
-    st.markdown('<div class="filter-section">', unsafe_allow_html=True)
+   # st.markdown('<div class="filter-section">', unsafe_allow_html=True)
     sort_by = st.selectbox(
         "📊 Sort By",
         ["Distance", "Rating", "Reviews", "Price (Low to High)", "Price (High to Low)"]
     )
-    st.markdown('</div>', unsafe_allow_html=True)
+  #  st.markdown('</div>', unsafe_allow_html=True)
     
     st.divider()
     
-    if st.button("🔄 Reset Filters", use_container_width=True):
+    if st.button("Reset Filters", use_container_width=True):
         st.rerun()
     
-    if st.button("🔍 Apply Filters", use_container_width=True, type="primary"):
+    if st.button("Apply Filters", use_container_width=True, type="primary"):
         st.success("Filters applied!")
 
 # Main Content
