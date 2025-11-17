@@ -5,7 +5,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+DEFAULT_DB_URL = "postgresql+psycopg2://postgres:postgres@localhost:5432/spotlight_ai"
+DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DB_URL)
+
+if not DATABASE_URL:
+	raise RuntimeError(
+		"DATABASE_URL is not configured. Set it in your environment or .env file."
+	)
 
 engine = create_engine(
 	DATABASE_URL,

@@ -1,16 +1,25 @@
 import os
-from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, Depends, HTTPException
-from pydantic import BaseModel, Field
-from dotenv import load_dotenv
-from sqlalchemy.orm import Session
+from typing import Any, Dict, List, Optional
+
 import chromadb
 from chromadb.config import Settings
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
-from database.db import Base, engine, get_db
-from database import models
-from services.gemini_service import get_embedding, generate_response, build_system_prompt, build_user_prompt
-from services.memory_service import (
+from backend.database import models
+from backend.database.db import Base, engine, get_db
+from backend.services.gemini_service import (
+	GeminiConfigError,
+	GeminiServiceError,
+	build_system_prompt,
+	build_user_prompt,
+	generate_response,
+	get_embedding,
+)
+from backend.services.memory_service import (
 	get_or_create_user,
 	get_user_preferences,
 	set_user_preferences,
@@ -20,19 +29,40 @@ from services.memory_service import (
 load_dotenv()
 
 CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR")
+os.makedirs(CHROMA_PERSIST_DIR, exist_ok=True)
+
+default_origins = [
+	"http://localhost:8501",
+	"http://127.0.0.1:8501",
+	"http://localhost:3000",
+]
+extra_origins = [
+	origin.strip()
+	for origin in os.getenv("CORS_ALLOW_ORIGINS", "").split(",")
+	if origin.strip()
+]
+ALLOW_ORIGINS = list({origin for origin in default_origins + extra_origins})
 
 # Initialize DB schema if not exists
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Spotlight-AI Backend", version="0.1.0")
 
+app.add_middleware(
+	CORSMiddleware,
+	allow_origins=ALLOW_ORIGINS or ["*"],
+	allow_credentials=True,
+	allow_methods=["*"],
+	allow_headers=["*"],
+)
 
-def get_chroma_client():
+
+def get_chroma_client() -> chromadb.PersistentClient:
 	client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR, settings=Settings(allow_reset=False))
 	return client
 
 
-def get_or_create_collection(client, name: str = "places"):
+def get_or_create_collection(client: chromadb.PersistentClient, name: str = "places"):
 	try:
 		return client.get_collection(name)
 	except Exception:
@@ -77,6 +107,9 @@ def health():
 
 @app.post("/ingest")
 def ingest(req: IngestRequest):
+	if not req.items:
+		raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No items provided for ingestion.")
+
 	client = get_chroma_client()
 	col = get_or_create_collection(client)
 
@@ -85,13 +118,22 @@ def ingest(req: IngestRequest):
 	metadatas = []
 	embeddings = []
 	for it in req.items:
-		metadatas.append({
-			"title": it.title,
-			"url": it.url,
-			"location": it.location,
-			"tags": it.tags or [],
-		})
-		embeddings.append(get_embedding(it.text))
+		metadatas.append(
+			{
+				"title": it.title,
+				"url": it.url,
+				"location": it.location,
+				"tags": it.tags or [],
+			}
+		)
+		try:
+			embeddings.append(get_embedding(it.text))
+		except GeminiConfigError as exc:
+			raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+		except GeminiServiceError as exc:
+			raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+		except Exception as exc:  # pragma: no cover - unexpected failures
+			raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Embedding generation failed.") from exc
 
 	col.upsert(ids=ids, metadatas=metadatas, documents=documents, embeddings=embeddings)
 	return {"inserted": len(ids)}
@@ -99,6 +141,9 @@ def ingest(req: IngestRequest):
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest, db: Session = Depends(get_db)):
+	if not req.query or not req.query.strip():
+		raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Query text is required.")
+
 	# Ensure user record and update preferences if provided
 	user = get_or_create_user(db, external_user_id=req.user_id)
 	if req.update_preferences:
@@ -109,8 +154,23 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
 	# Retrieve from Chroma
 	client = get_chroma_client()
 	col = get_or_create_collection(client)
-	query_embedding = get_embedding(req.query + (" " + req.location_hint if req.location_hint else ""))
-	results = col.query(query_embeddings=[query_embedding], n_results=8)
+	try:
+		query_embedding = get_embedding(req.query + (" " + req.location_hint if req.location_hint else ""))
+	except GeminiConfigError as exc:
+		raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+	except GeminiServiceError as exc:
+		raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+	if not query_embedding:
+		raise HTTPException(
+			status_code=status.HTTP_400_BAD_REQUEST,
+			detail="Unable to generate embedding for the provided query.",
+		)
+
+	try:
+		results = col.query(query_embeddings=[query_embedding], n_results=8)
+	except Exception as exc:  # pragma: no cover - chroma internal failure
+		raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Vector search failed.") from exc
 
 	retrieved_items: List[Dict[str, Any]] = []
 	if results and results.get("ids"):
@@ -125,7 +185,14 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
 	# Build prompt and call Gemini
 	system_prompt = build_system_prompt(pref_summary)
 	user_prompt = build_user_prompt(req.query, retrieved_items)
-	answer = generate_response(system_prompt, user_prompt)
+	try:
+		answer = generate_response(system_prompt, user_prompt)
+	except GeminiConfigError as exc:
+		raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+	except GeminiServiceError as exc:
+		raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+	except Exception as exc:  # pragma: no cover
+		raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)+" : Model generation failed.") from exc
 
 	# Save conversation + messages
 	conversation_id = req.conversation_id
