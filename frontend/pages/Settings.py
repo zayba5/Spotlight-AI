@@ -440,11 +440,3 @@ with tab5:
         st.caption(ref)
 
 # Footer
-st.divider()
-st.markdown("""
-<div style="text-align: center; color: #6c757d; padding: 2rem 0;">
-    <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">🔦 Spotlight AI</p>
-    <p style="font-size: 0.9rem;">Built with ❤️ by Howard Wei, Zayba Syed, and Tiana Phung</p>
-    <p style="font-size: 0.8rem;">© 2024 San Jose State University • All Rights Reserved</p>
-</div>
-""", unsafe_allow_html=True)
