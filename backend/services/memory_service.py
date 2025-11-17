@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
-from ..database import models
+from database import models
 
 PreferenceDict = Dict[str, str]
 

@@ -1,32 +1,35 @@
 import os
 from typing import List, Dict, Any
 from dotenv import load_dotenv
-import google.generativeai as genai
+import google.genai as genai
 from tenacity import retry, wait_exponential, stop_after_attempt
 
 load_dotenv()
 
 GEMINI_GENERATE_MODEL = os.getenv("GEMINI_GENERATE_MODEL")
 GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-if not GOOGLE_API_KEY:
-	raise RuntimeError("GOOGLE_API_KEY is not set. Please configure it in your environment.")
+if not GEMINI_API_KEY:
+	raise RuntimeError("GEMINI_API_KEY is not set. Please configure it in your environment.")
 
-genai.configure(api_key=GOOGLE_API_KEY)
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 def get_embedding(text: str) -> List[float]:
 	if not text:
 		return []
-	resp = genai.embed_content(model=GEMINI_EMBED_MODEL, content=text)
+	resp = client.models.embed_content(model=GEMINI_EMBED_MODEL, content=text)
 	return resp["embedding"]
 
 
 @retry(wait=wait_exponential(multiplier=1, min=1, max=10), stop=stop_after_attempt(3))
 def generate_response(system_prompt: str, user_prompt: str) -> str:
-	model = genai.GenerativeModel(GEMINI_GENERATE_MODEL, system_instruction=system_prompt)
-	resp = model.generate_content(user_prompt)
+	resp = client.models.generate_content(
+		model=GEMINI_GENERATE_MODEL,
+		contents=[user_prompt],
+		system_instruction=system_prompt,
+	)
 	return resp.text or ""
 
 

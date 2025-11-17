@@ -7,10 +7,10 @@ from sqlalchemy.orm import Session
 import chromadb
 from chromadb.config import Settings
 
-from .database.db import Base, engine, get_db
-from .database import models
-from .services.gemini_service import get_embedding, generate_response, build_system_prompt, build_user_prompt
-from .services.memory_service import (
+from database.db import Base, engine, get_db
+from database import models
+from services.gemini_service import get_embedding, generate_response, build_system_prompt, build_user_prompt
+from services.memory_service import (
 	get_or_create_user,
 	get_user_preferences,
 	set_user_preferences,
