@@ -10,27 +10,70 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
+# Top Navigation Bar (HTML + CSS)
 st.markdown("""
 <style>
-    /* Use a clean sans-serif similar to Yelp */
-    html, body, [class*="css"] {
-        font-family: 'Arial', 'Helvetica', sans-serif !important;
-        background-color: #fafafa;
-        color: #333;
+
+    /* --- REMOVE STREAMLIT DEFAULT TOP HEADER --- */
+    header[data-testid="stHeader"] {
+        visibility: hidden !important;
+        height: 0px !important;
     }
 
-    /* Sidebar */
+    /* --- FIXED TOP NAV BAR --- */
+    .custom-top-nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 60px;
+        background-color: #f44336 !important;
+        border-bottom: 1px solid #e53935;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        z-index: 99999 !important;
+    }
+
+    .custom-top-nav img {
+        height: 32px;
+        margin-right: 16px;
+        filter: brightness(0) invert(1);
+    }
+
+    .custom-top-nav input {
+        flex-grow: 1;
+        max-width: 500px;
+        height: 36px;
+        border: none;
+        border-radius: 18px;
+        padding: 0 16px;
+        background: #fff;
+        outline: none;
+    }
+
+    /* --- REMOVE ALL TOP SPACING FROM STREAMLIT --- */
+    [data-testid="stAppViewContainer"] {
+        padding-top: 0 !important;
+        margin-top: 30px !important;
+    }
+
     [data-testid="stSidebar"] {
-        background-color: #ffffff !important;
-        border-right: 1px solid #eee;
-    }
-    [data-testid="stSidebar"] h2 {
-        font-size: 1.3rem !important;
-        font-weight: 700;
-        color: #f44336;
+        padding-top: 0 !important;
+        margin-top: 30px !important;
     }
 
+    .main .block-container {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+
+    /* --- THE MISSING RULE (this one fixes your last gap!!) --- */
+    .main > div:nth-child(1) {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+            
     /* Buttons */
     .stButton > button {
         background: #f44336;
@@ -109,28 +152,17 @@ st.markdown("""
         text-decoration: underline;
     }
 
-    /* Top search bar styling */
-    .search-bar input {
-        width: 100%;
-        padding: 0.55rem 1rem;
-        border-radius: 8px;
-        border: 1px solid #ccc;
-        font-size: 1rem;
-        outline: none;
-        margin-bottom: 15px;
-    }
-    .search-bar input:focus {
-        border-color: #f44336;
-        box-shadow: 0 0 4px rgba(211,35,35,0.3);
-    }
 </style>
+
+<div class="custom-top-nav">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/No_image_available_600_x_450.svg">
+    <input type="text" placeholder="Search Spotlight AI...">
+</div>
 """, unsafe_allow_html=True)
+
 
 # Add a search bar at the top
 st.markdown("""
-<div class="search-bar">
-    <input type="text" id="top-search" placeholder="Search for restaurants, cafes, or bars...">
-</div>
 """, unsafe_allow_html=True)
 
 
