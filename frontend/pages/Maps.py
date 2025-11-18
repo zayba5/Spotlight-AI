@@ -141,29 +141,29 @@ with st.sidebar:
     # Price Range
     #st.markdown('<div class="filter-section">', unsafe_allow_html=True)
     price_filter = st.multiselect(
-        "💰 Price Range",
+        "Price Range",
         ["$", "$$", "$$$", "$$$$"],
         default=["$", "$$"]
     )
     #st.markdown('</div>', unsafe_allow_html=True)
     
     # Rating
-    min_rating = st.slider("⭐ Minimum Rating", 1.0, 5.0, 4.0, 0.5)
+    min_rating = st.slider("Minimum Rating", 1.0, 5.0, 4.0, 0.5)
     
     # Categories
     categories = st.multiselect(
-        "🏷️ Categories",
+        "Categories",
         ["Coffee & Tea", "Restaurants", "Cafes", "Bars", "Fast Food", "Desserts"],
         default=["Coffee & Tea"]
     )
     
     # Open Now
-    open_now = st.checkbox("🕐 Open Now", value=True)
+    open_now = st.checkbox("Open Now", value=True)
     
     # Sort By
    # st.markdown('<div class="filter-section">', unsafe_allow_html=True)
     sort_by = st.selectbox(
-        "📊 Sort By",
+        "Sort By",
         ["Distance", "Rating", "Reviews", "Price (Low to High)", "Price (High to Low)"]
     )
   #  st.markdown('</div>', unsafe_allow_html=True)
@@ -177,12 +177,12 @@ with st.sidebar:
         st.success("Filters applied!")
 
 # Main Content
-st.title("🗺️ Search Results & Map View")
+st.title("Search Results & Map View")
 
 # Search bar
 col1, col2 = st.columns([4, 1])
 with col1:
-    search_query = st.text_input("🔍 Search for places", placeholder="e.g., coffee shops, Italian restaurants, bars...")
+    search_query = st.text_input(" Search for places", placeholder="e.g., coffee shops, Italian restaurants, bars...")
 with col2:
     if st.button("Search", use_container_width=True, type="primary"):
         st.info(f"Searching for: {search_query}")
@@ -195,9 +195,9 @@ if open_now:
 st.markdown(f"### Found {len(filtered_results)} places within {distance_radius} miles")
 
 # View toggle
-view_mode = st.radio("View Mode:", ["📋 List View", "🗺️ Map View", "⚡ Split View"], horizontal=True)
+view_mode = st.radio("View Mode:", ["List View", "Map View", "Split View"], horizontal=True)
 
-if view_mode == "📋 List View":
+if view_mode == "List View":
     # List view only
     for result in filtered_results:
         with st.container():
@@ -205,45 +205,45 @@ if view_mode == "📋 List View":
             <div class="result-card">
                 <div class="result-header">{result['name']}</div>
                 <div class="result-meta">
-                    ⭐ {result['rating']} ({result['reviews']} reviews) • 
+                    ★ {result['rating']} ({result['reviews']} reviews) • 
                     {result['price']} • 
                     {result['category']}
                 </div>
                 <div>
                     <span class="badge {'badge-open' if result['open_now'] else 'badge-closed'}">{result['hours']}</span>
-                    <span class="badge badge-distance">📍 {result['distance']} mi</span>
+                    <span class="badge badge-distance"> {result['distance']} mi</span>
                     <span class="badge badge-price">{result['price']}</span>
                 </div>
                 <p style="margin-top: 12px; color: #555;">{result['description']}</p>
-                <p style="font-size: 14px; color: #7f8c8d;">📍 {result['address']}</p>
+                <p style="font-size: 14px; color: #7f8c8d;"> {result['address']}</p>
             </div>
             """, unsafe_allow_html=True)
             
             col1, col2, col3, col4 = st.columns(4)
             with col1:
-                if st.button("🗺️ Directions", key=f"dir_{result['name']}"):
+                if st.button("Directions", key=f"dir_{result['name']}"):
                     st.info(f"Opening directions to {result['name']}")
             with col2:
-                if st.button("ℹ️ Details", key=f"details_{result['name']}"):
+                if st.button("Details", key=f"details_{result['name']}"):
                     with st.expander(f"Details for {result['name']}", expanded=True):
-                        st.markdown(f"**⭐ Rating:** {result['rating']}/5.0")
-                        st.markdown(f"**💬 Reviews:** {result['reviews']}")
-                        st.markdown(f"**💰 Price:** {result['price']}")
-                        st.markdown(f"**📍 Address:** {result['address']}")
-                        st.markdown(f"**🕐 Hours:** {result['hours']}")
-                        st.markdown(f"**📏 Distance:** {result['distance']} miles")
+                        st.markdown(f"** Rating:** {result['rating']}/5.0")
+                        st.markdown(f"** Reviews:** {result['reviews']}")
+                        st.markdown(f"** Price:** {result['price']}")
+                        st.markdown(f"** Address:** {result['address']}")
+                        st.markdown(f"** Hours:** {result['hours']}")
+                        st.markdown(f"** Distance:** {result['distance']} miles")
                         st.markdown("---")
                         st.markdown("**Recent Reviews:**")
                         st.markdown("> Great coffee and atmosphere! Perfect for working.")
                         st.markdown("> Friendly staff and quick service.")
             with col3:
-                if st.button("❤️ Save", key=f"save_{result['name']}"):
+                if st.button("Save", key=f"save_{result['name']}"):
                     st.success(f"Saved {result['name']}!")
             with col4:
-                if st.button("📞 Call", key=f"call_{result['name']}"):
+                if st.button("Call", key=f"call_{result['name']}"):
                     st.info("Phone: (408) 555-0123")
 
-elif view_mode == "🗺️ Map View":
+elif view_mode == "Map View":
     # Map view only
     df = pd.DataFrame(filtered_results)
     
@@ -265,7 +265,7 @@ elif view_mode == "🗺️ Map View":
     )
     
     tooltip = {
-        "html": "<b>{name}</b><br/>⭐ {rating} ({reviews} reviews)<br/>📍 {distance} mi<br/>{price}",
+        "html": "<b>{name}</b><br/>★ {rating} ({reviews} reviews)<br/>📍 {distance} mi<br/>{price}",
         "style": {"backgroundColor": "steelblue", "color": "white"}
     }
     
@@ -277,22 +277,18 @@ elif view_mode == "🗺️ Map View":
         height=600
     ))
     
-    # Legend
-    st.markdown("**🗺️ Map Legend:**")
-    st.markdown("• Blue dots represent recommended places")
-    st.markdown("• Click on a dot to see details")
-    st.markdown(f"• Showing {len(filtered_results)} results within {distance_radius} miles")
+    
 
 else:  # Split View
     col1, col2 = st.columns([1, 1])
     
     with col1:
-        st.markdown("### 📋 Results")
+        st.markdown("### Results")
         for result in filtered_results[:3]:  # Show first 3 in split view
             st.markdown(f"""
             <div class="result-card">
                 <div class="result-header">{result['name']}</div>
-                <div class="result-meta">⭐ {result['rating']} • {result['price']} • {result['distance']} mi</div>
+                <div class="result-meta">★ {result['rating']} • {result['price']} • {result['distance']} mi</div>
                 <span class="badge {'badge-open' if result['open_now'] else ''}">{result['hours']}</span>
             </div>
             """, unsafe_allow_html=True)
@@ -301,7 +297,7 @@ else:  # Split View
                 st.info(f"Opening {result['name']}")
     
     with col2:
-        st.markdown("### 🗺️ Map")
+        st.markdown("### Map")
         df = pd.DataFrame(filtered_results)
         
         view_state = pdk.ViewState(
@@ -321,7 +317,7 @@ else:  # Split View
         )
         
         tooltip = {
-            "html": "<b>{name}</b><br/>⭐ {rating}<br/>{price}",
+            "html": "<b>{name}</b><br/>★ {rating}<br/>{price}",
             "style": {"backgroundColor": "steelblue", "color": "white"}
         }
         
@@ -333,6 +329,4 @@ else:  # Split View
             height=500
         ))
 
-# Footer
-st.divider()
-st.caption("💡 Tip: Use filters to narrow down your search and find exactly what you're looking for!")
+
