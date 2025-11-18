@@ -13,71 +13,126 @@ st.set_page_config(
 # Custom CSS
 st.markdown("""
 <style>
-    /* Sidebar styling */
-    [data-testid="stSidebar"] {
-        background-color: #f5f5f5;
-    }
-    [data-testid="stSidebar"] > div:first-child {
-        background-color: #f0f2f6;
-    }
-    /* Make sidebar headers bigger */
-    [data-testid="stSidebar"] h2 {
-        font-size: 1.5rem !important;
-        font-weight: bold;
+    /* Use a clean sans-serif similar to Yelp */
+    html, body, [class*="css"] {
+        font-family: 'Arial', 'Helvetica', sans-serif !important;
+        background-color: #fafafa;
+        color: #333;
     }
 
- .stButton > button {
-        background: #f44336;      /* main color */
-        color: white;             /* text */
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background-color: #ffffff !important;
+        border-right: 1px solid #eee;
+    }
+    [data-testid="stSidebar"] h2 {
+        font-size: 1.3rem !important;
+        font-weight: 700;
+        color: #f44336;
+    }
+
+    /* Buttons */
+    .stButton > button {
+        background: #f44336;
+        color: white;
         border: none;
-        border-radius: 12px;
-        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        padding: 0.45rem 0.75rem;
+        font-size: 0.9rem;
         font-weight: 600;
+        transition: all 0.15s ease;
+        box-shadow: 0px 2px 4px rgba(0,0,0,0.08);
     }
     .stButton > button:hover {
-        background: #bc342a;
+        background: #a51818;
+        transform: translateY(-1px);
+        box-shadow: 0px 3px 6px rgba(0,0,0,0.12);
     }
 
+    /* Chat messages */
     .stChatMessage {
         padding: 1rem;
-        border-radius: 0.5rem;
-    }
-    .place-card {
-        border: 1px solid #ddd;
         border-radius: 12px;
-        padding: 20px;
-        margin: 15px 0;
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        background: #fff;
+        border: 1px solid #eee;
+        margin-bottom: 0.75rem;
+        box-shadow: 0px 1px 3px rgba(0,0,0,0.06);
     }
+
+    /* Place cards */
+    .place-card {
+        border: 1px solid #eee;
+        border-radius: 12px;
+        padding: 18px;
+        margin: 12px 0;
+        background: #fff;
+        box-shadow: 0 3px 6px rgba(0,0,0,0.05);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .place-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.12);
+    }
+
     .place-header {
-        font-size: 20px;
-        font-weight: bold;
-        margin-bottom: 8px;
-        color: #2c3e50;
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 6px;
+        color: #f44336;
     }
+
     .place-rating {
         color: #f39c12;
         font-size: 14px;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
+        font-weight: 500;
     }
+
     .citation {
         font-size: 13px;
         color: #555;
         font-style: italic;
-        margin-top: 12px;
-        padding: 10px;
-        background-color: rgba(255,255,255,0.7);
-        border-left: 4px solid #667eea;
+        margin-top: 10px;
+        padding: 8px;
+        background-color: #f8f8f8;
+        border-left: 4px solid #f44336;
         border-radius: 4px;
     }
+
     .source-link {
-        color: #667eea;
+        color: #f44336;
         text-decoration: none;
         font-size: 12px;
+        font-weight: 500;
+    }
+    .source-link:hover {
+        text-decoration: underline;
+    }
+
+    /* Top search bar styling */
+    .search-bar input {
+        width: 100%;
+        padding: 0.55rem 1rem;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        font-size: 1rem;
+        outline: none;
+        margin-bottom: 15px;
+    }
+    .search-bar input:focus {
+        border-color: #f44336;
+        box-shadow: 0 0 4px rgba(211,35,35,0.3);
     }
 </style>
 """, unsafe_allow_html=True)
+
+# Add a search bar at the top
+st.markdown("""
+<div class="search-bar">
+    <input type="text" id="top-search" placeholder="Search for restaurants, cafes, or bars...">
+</div>
+""", unsafe_allow_html=True)
+
 
 # Initialize session state
 if 'authenticated' not in st.session_state:
@@ -99,17 +154,7 @@ if 'user_preferences' not in st.session_state:
 
 # Sidebar - Preferences and Filters
 with st.sidebar:
-    if st.button("Search & Map", use_container_width=True):
-        st.switch_page("pages/Maps.py")
-    if st.button("Profile", use_container_width=True):
-        st.switch_page("pages/Profile.py")
-    if st.button("History", use_container_width=True):
-        st.switch_page("pages/History.py")
-    if st.button("Settings", use_container_width=True):
-        st.switch_page("pages/Settings.py")
-        st.divider()
-
-    st.divider()
+    # Remove all the buttons here — no navigation buttons at all
 
     st.header("**Preferences:**")
     
@@ -147,16 +192,7 @@ with st.sidebar:
     # Save preferences
     if st.button("Save Preferences"):
         st.success("Preferences saved!")
-    
 
-    
-    
-    
-    
-   
-   # st.divider()
-    
- 
 
 # Main content area
 st.title("🔦 Spotlight AI")
