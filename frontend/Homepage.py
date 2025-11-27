@@ -5,54 +5,166 @@ from datetime import datetime
 # Page config
 st.set_page_config(
     page_title="Spotlight AI - Chat",
-    page_icon="🔦",
+    #page_icon="🔦",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
+# Top Navigation Bar (HTML + CSS)
 st.markdown("""
 <style>
+
+    /* --- REMOVE STREAMLIT DEFAULT TOP HEADER --- */
+    header[data-testid="stHeader"] {
+        visibility: hidden !important;
+        height: 0px !important;
+    }
+
+    /* --- FIXED TOP NAV BAR --- */
+    .custom-top-nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 60px;
+        background-color: #f44336 !important;
+        border-bottom: 1px solid #e53935;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        z-index: 99999 !important;
+    }
+
+    .custom-top-nav img {
+        height: 32px;
+        margin-right: 16px;
+        filter: brightness(0) invert(1);
+    }
+
+    .custom-top-nav input {
+        flex-grow: 1;
+        max-width: 500px;
+        height: 36px;
+        border: none;
+        border-radius: 18px;
+        padding: 0 16px;
+        background: #fff;
+        outline: none;
+    }
+
+    /* --- REMOVE ALL TOP SPACING FROM STREAMLIT --- */
+    [data-testid="stAppViewContainer"] {
+        padding-top: 0 !important;
+        margin-top: 30px !important;
+    }
+
+    [data-testid="stSidebar"] {
+        padding-top: 0 !important;
+        margin-top: 30px !important;
+    }
+
+    .main .block-container {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+
+    /* --- THE MISSING RULE (this one fixes your last gap!!) --- */
+    .main > div:nth-child(1) {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+            
+    /* Buttons */
+    .stButton > button {
+        background: #f44336;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 0.45rem 0.75rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        transition: all 0.15s ease;
+        box-shadow: 0px 2px 4px rgba(0,0,0,0.08);
+    }
+    .stButton > button:hover {
+        background: #a51818;
+        transform: translateY(-1px);
+        box-shadow: 0px 3px 6px rgba(0,0,0,0.12);
+    }
+
+    /* Chat messages */
     .stChatMessage {
         padding: 1rem;
-        border-radius: 0.5rem;
-    }
-    .place-card {
-        border: 1px solid #ddd;
         border-radius: 12px;
-        padding: 20px;
-        margin: 15px 0;
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        background: #fff;
+        border: 1px solid #eee;
+        margin-bottom: 0.75rem;
+        box-shadow: 0px 1px 3px rgba(0,0,0,0.06);
     }
+
+    /* Place cards */
+    .place-card {
+        border: 1px solid #eee;
+        border-radius: 12px;
+        padding: 18px;
+        margin: 12px 0;
+        background: #fff;
+        box-shadow: 0 3px 6px rgba(0,0,0,0.05);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .place-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.12);
+    }
+
     .place-header {
-        font-size: 20px;
-        font-weight: bold;
-        margin-bottom: 8px;
-        color: #2c3e50;
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 6px;
+        color: #f44336;
     }
+
     .place-rating {
         color: #f39c12;
         font-size: 14px;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
+        font-weight: 500;
     }
+
     .citation {
         font-size: 13px;
         color: #555;
         font-style: italic;
-        margin-top: 12px;
-        padding: 10px;
-        background-color: rgba(255,255,255,0.7);
-        border-left: 4px solid #667eea;
+        margin-top: 10px;
+        padding: 8px;
+        background-color: #f8f8f8;
+        border-left: 4px solid #f44336;
         border-radius: 4px;
     }
+
     .source-link {
-        color: #667eea;
+        color: #f44336;
         text-decoration: none;
         font-size: 12px;
+        font-weight: 500;
     }
+    .source-link:hover {
+        text-decoration: underline;
+    }
+
 </style>
+
+<div class="custom-top-nav">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/No_image_available_600_x_450.svg">
+    <input type="text" placeholder="Search Spotlight AI...">
+</div>
 """, unsafe_allow_html=True)
+
+
+# Add a search bar at the top
+st.markdown("""
+""", unsafe_allow_html=True)
+
 
 # Initialize session state
 if 'authenticated' not in st.session_state:
@@ -67,14 +179,16 @@ if 'user_preferences' not in st.session_state:
         'price_range': [1, 4],
         'noise_preference': 'Any',
         'cuisine_preferences': [],
-        'location': 'San Jose, CA',
+        'location': 'San Jose, CA', #default location
         'liked_places': [],
         'search_history': []
     }
 
 # Sidebar - Preferences and Filters
 with st.sidebar:
-    st.header("🎯 Your Preferences")
+    # Remove all the buttons here — no navigation buttons at all
+
+    st.header("**Preferences:**")
     
     # Location
     st.subheader("📍 Location")
@@ -110,41 +224,7 @@ with st.sidebar:
     # Save preferences
     if st.button("Save Preferences"):
         st.success("Preferences saved!")
-    
-    st.divider()
-    
-    # Memory Display
-    st.subheader("🧠 What I Remember")
-    if st.session_state.user_preferences['liked_places']:
-        st.write("**Your favorite places:**")
-        for place in st.session_state.user_preferences['liked_places'][-3:]:
-            st.write(f"• {place}")
-    else:
-        st.info("I'll learn your preferences as we chat!")
-    
-    if dietary_prefs:
-        st.write(f"**Dietary:** {', '.join(dietary_prefs)}")
-    
-    if st.button("Clear Memory"):
-        st.session_state.user_preferences['liked_places'] = []
-        st.rerun()
-    
-    st.divider()
-    
-    # Navigation
-    st.subheader("📱 Navigation")
-    if st.button("👤 Profile", use_container_width=True):
-        st.switch_page("pages/1_👤_Profile.py")
-    if st.button("🗺️ Search & Map", use_container_width=True):
-        st.switch_page("pages/2_🗺️_Search_Map.py")
-    if st.button("📚 History", use_container_width=True):
-        st.switch_page("pages/3_📚_History.py")
-    if st.button("ℹ️ About", use_container_width=True):
-        st.switch_page("pages/4_ℹ️_About.py")
-    
-   # st.divider()
-    
- 
+
 
 # Main content area
 st.title("🔦 Spotlight AI")
@@ -159,7 +239,7 @@ if len(st.session_state.messages) == 0:
             user_query = "Best pizza near me"
             st.session_state.messages.append({"role": "user", "content": user_query})
             st.rerun()
-        if st.button("☕ Quiet coffee shops with WiFi"):
+        if st.button("☕️ Quiet coffee shops with WiFi"):
             user_query = "Quiet coffee shops with WiFi"
             st.session_state.messages.append({"role": "user", "content": user_query})
             st.rerun()
@@ -286,4 +366,4 @@ if prompt := st.chat_input("Ask me about local places..."):
 
 # Footer
 st.divider()
-st.caption("🔦 Spotlight AI • Powered by RAG + Yelp + Google Places • Built by Howard, Zayba, and Tiana")
+#st.caption("🔦 Spotlight AI • Powered by RAG + Yelp + Google Places • Built by Howard, Zayba, and Tiana")

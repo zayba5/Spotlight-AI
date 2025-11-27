@@ -4,7 +4,6 @@ from datetime import datetime
 # Page config
 st.set_page_config(
     page_title="Spotlight AI - Profile",
-    page_icon="👤",
     layout="wide"
 )
 
@@ -41,7 +40,7 @@ st.markdown("""
 
 # Initialize session state
 if 'user_data' not in st.session_state:
-    st.session_state.user_data = {'email': 'demo@spotlight.ai', 'name': 'Demo User'}
+    st.session_state.user_data = {'email': 'firstlast@email.com', 'name': 'First Last'}
 if 'user_preferences' not in st.session_state:
     st.session_state.user_preferences = {
         'dietary': [],
@@ -102,7 +101,15 @@ with col4:
 st.divider()
 
 # Account Information
-st.markdown("## 👤 Account Information")
+st.markdown("## Account Information")
+
+# Profile Picture Placeholder
+st.markdown("""
+<div class="profile-picture">
+    👤
+    <!-- Replace this div with: <img src="your-image-url.jpg" alt="Profile Picture"> -->
+</div>
+""", unsafe_allow_html=True)
 
 col1, col2 = st.columns(2)
 
@@ -248,6 +255,4 @@ with st.expander("⚠️ Danger Zone"):
         if st.button("❌ Delete Account", type="secondary"):
             st.error("Account deletion is not available in demo mode")
 
-# Footer
-st.divider()
-st.caption("🔒 Your data is private and secure. We never share your information with third parties.")
+
