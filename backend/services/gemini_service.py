@@ -3,12 +3,16 @@ from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 from google import genai
+from google.genai import types
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 load_dotenv()
 
 GEMINI_GENERATE_MODEL = os.getenv("GEMINI_GENERATE_MODEL") or os.getenv("GEMINI_MODEL") or "gemini-2.5-pro"
 GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL") or "text-embedding-004"
+
+_client: Optional[genai.Client] = None
+_client_api_key: Optional[str] = None
 
 class GeminiServiceError(RuntimeError):
 	"""Base exception for Gemini-related failures."""
@@ -19,6 +23,20 @@ class GeminiConfigError(GeminiServiceError):
 
 client = genai.Client()
 
+def _get_api_key() -> str:
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise GeminiConfigError("Gemini API key not configured. Set GEMINI_API_KEY or GOOGLE_API_KEY.")
+    return api_key
+
+
+def _get_client() -> genai.Client:
+    global _client, _client_api_key
+    api_key = _get_api_key()
+    if _client is None or _client_api_key != api_key:
+        _client = genai.Client(api_key=api_key)
+        _client_api_key = api_key
+    return _client
 
 def _ensure_text_from_response(response: Any) -> str:
 	if hasattr(response, "output_text") and response.output_text:
@@ -92,18 +110,17 @@ def _ensure_embedding_from_response(response: Any) -> List[float]:
 def get_embedding(text: str) -> List[float]:
 	if not text:
 		return []
+	client = _get_client()
 	try:
 		response = client.models.embed_content(
 			model=GEMINI_EMBED_MODEL,
 			contents={"parts": [{"text": text}]},
 		)
-		client.close()
 	except TypeError:
 		response = client.models.embed_content(
 			model=GEMINI_EMBED_MODEL,
 			contents=text,
 		)
-		client.close()
 	except Exception as exc:  # pragma: no cover - SDK specific errors
 		raise GeminiServiceError(f"Gemini embedding request failed: {exc}") from exc
 	return _ensure_embedding_from_response(response)
@@ -111,13 +128,15 @@ def get_embedding(text: str) -> List[float]:
 
 @retry(wait=wait_exponential(multiplier=1, min=1, max=10), stop=stop_after_attempt(3))
 def generate_response(system_prompt: str, user_prompt: str) -> str:
+	client = _get_client()
 	try:
 		response = client.models.generate_content(
 			model=GEMINI_GENERATE_MODEL,
-			system_instruction=system_prompt,
 			contents=user_prompt,
+			config=types.GenerateContentConfig(
+				system_instruction=system_prompt
+			),
 		)
-		client.close()
 	except Exception as exc:  # pragma: no cover - SDK specific errors
 		raise GeminiServiceError(f"Gemini text generation failed: {exc}") from exc
 
