@@ -123,7 +123,7 @@ def ingest(req: IngestRequest):
 				"title": it.title,
 				"url": it.url,
 				"location": it.location,
-				"tags": it.tags or [],
+				"tags": ", ".join(it.tags) if it.tags else None,
 			}
 		)
 		try:
