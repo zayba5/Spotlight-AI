@@ -185,9 +185,11 @@ if 'user_preferences' not in st.session_state:
         'price_range': [1, 4],
         'noise_preference': 'Any',
         'cuisine_preferences': [],
-        'location': 'San Jose, CA', #default location
+        'location': 'San Jose, CA',  # default location
         'liked_places': [],
-        'search_history': []
+        'search_history': [],
+        'distance_miles': 5,
+        'open_now': True,
     }
 
 # Sidebar - Preferences and Filters
@@ -199,33 +201,14 @@ with st.sidebar:
     # Location
     st.subheader("📍 Location")
     user_location = st.text_input("Current Location", value=st.session_state.user_preferences.get('location', 'San Jose, CA'))
-    distance_radius = st.slider("Search Radius (miles)", 1, 25, 5)
+    distance_radius = st.slider(
+        "Search Radius (miles)",
+        1,
+        25,
+        int(st.session_state.user_preferences.get('distance_miles', 5)),
+    )
     st.session_state.user_preferences['location'] = user_location
-    
-    # Preferences
-    st.subheader("⚙️ Filters")
-    price_range = st.select_slider(
-        "Price Range",
-        options=["$", "$$", "$$$", "$$$$"],
-        value=("$", "$$$$")
-    )
-    st.session_state.user_preferences['price_range'] = price_range
-    
-    dietary_prefs = st.multiselect(
-        "Dietary Preferences",
-        ["Vegetarian", "Vegan", "Gluten-Free", "Halal", "Kosher"],
-        default=st.session_state.user_preferences.get('dietary', [])
-    )
-    st.session_state.user_preferences['dietary'] = dietary_prefs
-    
-    noise_level = st.radio(
-        "Noise Preference",
-        ["Any", "Quiet", "Moderate", "Lively"],
-        index=["Any", "Quiet", "Moderate", "Lively"].index(st.session_state.user_preferences.get('noise_preference', 'Any'))
-    )
-    st.session_state.user_preferences['noise_preference'] = noise_level
-    
-    open_now = st.checkbox("Open Now", value=True)
+    st.session_state.user_preferences['distance_miles'] = distance_radius
     
     # Save preferences
     if st.button("Save Preferences"):
@@ -270,25 +253,17 @@ for message in st.session_state.messages:
                 st.markdown(f"""
                 <div class="place-card">
                     <div class="place-header">{place['name']}</div>
-                    <div class="place-rating">⭐ {place['rating']} ({place['reviews']} reviews) • {place['price']}</div>
+                    <div class="place-rating">⭐ {place['rating']} ({place['reviews']} reviews)</div>
                     <p>{place['description']}</p>
-                    <div class="citation">💬 "{place['citation']}" - Yelp Review</div>
+                    <div class="citation">💬 "{place['citation']}" - Review</div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Action buttons
-                btn_cols = st.columns(3)
-                with btn_cols[0]:
-                    if st.button(f"📍 Directions", key=f"dir_{place['name']}"):
-                        st.info(f"Opening directions to {place['name']}...")
-                with btn_cols[1]:
-                    if st.button(f"❤️ Save", key=f"save_{place['name']}"):
-                        if place['name'] not in st.session_state.user_preferences['liked_places']:
-                            st.session_state.user_preferences['liked_places'].append(place['name'])
-                            st.success(f"Saved {place['name']}!")
-                with btn_cols[2]:
-                    if st.button(f"ℹ️ More Info", key=f"info_{place['name']}"):
-                        st.info(f"Opening Yelp page for {place['name']}...")
+                # Single action button: Save
+                if st.button(f"❤️ Save {place['name']}", key=f"save_{place['name']}"):
+                    if place['name'] not in st.session_state.user_preferences['liked_places']:
+                        st.session_state.user_preferences['liked_places'].append(place['name'])
+                        st.success(f"Saved {place['name']}!")
 
 # Chat input
 if prompt := st.chat_input("Ask me about local places..."):
@@ -307,30 +282,24 @@ if prompt := st.chat_input("Ask me about local places..."):
     
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            
-            # --- Geocode the user location ---
-            user_location = st.session_state.user_preferences.get('location', None)
+            # Geocode user location (once)
+            geolocator = Nominatim(user_agent="spotlight_ai")
+            user_location_str = st.session_state.user_preferences.get("location", None)
             latitude, longitude = None, None
-            if user_location:
+            if user_location_str:
                 try:
-                    geolocator = Nominatim(user_agent="spotlight_ai")
-                    location = geolocator.geocode(user_location)
+                    location = geolocator.geocode(user_location_str)
                     if location:
                         latitude = location.latitude
                         longitude = location.longitude
                 except Exception as e:
                     st.warning(f"Geocoding failed: {e}")
-            
-            
-            # Geocode user location
-            geolocator = Nominatim(user_agent="spotlight_ai")
-            user_location_str = st.session_state.user_preferences.get("location", None)
-            latitude, longitude = None, None
-            if user_location_str:
-                location = geolocator.geocode(user_location_str)
-                if location:
-                    latitude = location.latitude
-                    longitude = location.longitude
+
+            # Active filters to send to the backend /chat endpoint
+            # For now we only use distance; other UI filters are not exposed.
+            filters = {
+                "distance_miles": st.session_state.user_preferences.get("distance_miles", 5),
+            }
 
             # Prepare request payload
             payload = {
@@ -340,7 +309,8 @@ if prompt := st.chat_input("Ask me about local places..."):
                 "latitude": latitude,
                 "longitude": longitude,
                 "update_preferences": None,
-                "conversation_id": None
+                "conversation_id": None,
+                "filters": filters,
             }
 
 
@@ -358,22 +328,45 @@ if prompt := st.chat_input("Ask me about local places..."):
                     citations = data.get("citations", [])
                     places = []
 
-                    # Extract structured place info (if any)
+                    # Extract structured place info (if any). Each citation
+                    # now includes rating, review_count, and a random_review
+                    # snippet to display alongside the AI answer.
                     for c in citations:
-                        if c.get("title"):
+                        title = c.get("title")
+                        if title:
                             places.append({
-                                "name": c["title"],
+                                "name": title,
                                 "rating": c.get("rating", "?"),
                                 "reviews": c.get("review_count", "?"),
-                                "price": c.get("price", "?"),
-                                "description": c.get("document", ""),
-                                "citation": c.get("url", ""),
+                                # For now we don't have a richer summary field;
+                                # leave description empty or use random_review if desired.
+                                "description": "",
+                                # Show one random review (or snippet) beneath each card.
+                                "citation": c.get("random_review", "") or "",
                             })
 
                 # Display assistant text
                 st.markdown(assistant_answer)
 
-                # Save assistant message
+                # Immediately display place cards for this response,
+                # so the user sees them without needing another input.
+                for place in places:
+                    st.markdown(f"""
+                    <div class="place-card">
+                        <div class="place-header">{place['name']}</div>
+                        <div class="place-rating">⭐ {place['rating']} ({place['reviews']} reviews)</div>
+                        <p>{place['description']}</p>
+                        <div class="citation">💬 "{place['citation']}" - Review</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    # Single action button: Save
+                    if st.button(f"❤️ Save {place['name']}", key=f"save_{place['name']}_inline"):
+                        if place['name'] not in st.session_state.user_preferences['liked_places']:
+                            st.session_state.user_preferences['liked_places'].append(place['name'])
+                            st.success(f"Saved {place['name']}!")
+
+                # Save assistant message (so cards re-render on future reruns)
                 st.session_state.messages.append({
                     "role": "assistant",
                     "content": assistant_answer,
