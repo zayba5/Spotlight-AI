@@ -28,6 +28,8 @@ class Business(Base):
 	city = Column(String, nullable=True)
 	state = Column(String, nullable=True)
 	postal_code = Column(String, nullable=True)
+	latitude = Column(Float, nullable=True)
+	longitude = Column(Float, nullable=True)
 	stars = Column(Float, nullable=True)
 	review_count = Column(Integer, nullable=True)
 	categories = Column(String, nullable=True)

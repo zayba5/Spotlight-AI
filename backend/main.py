@@ -100,7 +100,12 @@ class GooglePlacesIngestRequest(BaseModel):
 class ChatRequest(BaseModel):
 	user_id: str
 	query: str
+	# Optional human-readable location hint (city / neighborhood)
 	location_hint: Optional[str] = None
+	# Optional precise location; if both latitude and longitude are provided,
+	# they will be used to bias nearby restaurant searches (e.g. Google Places).
+	latitude: Optional[float] = None
+	longitude: Optional[float] = None
 	update_preferences: Optional[Dict[str, str]] = None
 	conversation_id: Optional[int] = None
 
@@ -281,9 +286,14 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
 	prefs = get_user_preferences(db, user.id)
 	pref_summary = summarize_preferences(prefs)
 
+	# Derive a precise "lat,lng" string if available for downstream services
+	lat_lng_str: Optional[str] = None
+	if req.latitude is not None and req.longitude is not None:
+		lat_lng_str = f"{req.latitude},{req.longitude}"
+
 	# Decide which data sources to use (Chroma vs Google Places)
 	try:
-		plan = plan_data_sources(req.query, req.location_hint)
+		plan = plan_data_sources(req.query, lat_lng_str or req.location_hint)
 	except GeminiServiceError:
 		# Fallback: always use Chroma only
 		plan = {
@@ -301,7 +311,9 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
 		client = get_chroma_client()
 		col = get_or_create_collection(client)
 		try:
-			query_embedding = get_embedding(req.query + (" " + req.location_hint if req.location_hint else ""))
+			# location_hint is used only to slightly bias semantic retrieval; prefer human-readable hints
+			location_text = req.location_hint or ""
+			query_embedding = get_embedding(req.query + (f" {location_text}" if location_text else ""))
 		except GeminiConfigError as exc:
 			raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 		except GeminiServiceError as exc:
@@ -332,7 +344,7 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
 		try:
 			places = search_places(
 				query=plan.get("google_places_query") or req.query,
-				location=plan.get("google_places_location") or req.location_hint,
+				location=plan.get("google_places_location") or lat_lng_str or req.location_hint,
 				radius=int(plan.get("google_places_radius") or 5000),
 				max_results=10,
 			)

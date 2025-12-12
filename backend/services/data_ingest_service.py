@@ -66,6 +66,8 @@ def ingest_businesses_from_db(
 				"city": b.city,
 				"state": b.state,
 				"postal_code": b.postal_code,
+				"latitude": b.latitude,
+				"longitude": b.longitude,
 				"category": b.categories,
 				"stars": b.stars,
 				"review_count": b.review_count,
