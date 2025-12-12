@@ -5,8 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DEFAULT_DB_URL = "postgresql+psycopg2://postgres:postgres@localhost:5432/spotlight_ai"
-DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DB_URL)
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not DATABASE_URL:
 	raise RuntimeError(
