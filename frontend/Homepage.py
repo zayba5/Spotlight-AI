@@ -185,9 +185,11 @@ if 'user_preferences' not in st.session_state:
         'price_range': [1, 4],
         'noise_preference': 'Any',
         'cuisine_preferences': [],
-        'location': 'San Jose, CA', #default location
+        'location': 'San Jose, CA',  # default location
         'liked_places': [],
-        'search_history': []
+        'search_history': [],
+        'distance_miles': 5,
+        'open_now': True,
     }
 
 # Sidebar - Preferences and Filters
@@ -199,8 +201,14 @@ with st.sidebar:
     # Location
     st.subheader("📍 Location")
     user_location = st.text_input("Current Location", value=st.session_state.user_preferences.get('location', 'San Jose, CA'))
-    distance_radius = st.slider("Search Radius (miles)", 1, 25, 5)
+    distance_radius = st.slider(
+        "Search Radius (miles)",
+        1,
+        25,
+        int(st.session_state.user_preferences.get('distance_miles', 5)),
+    )
     st.session_state.user_preferences['location'] = user_location
+    st.session_state.user_preferences['distance_miles'] = distance_radius
     
     # Preferences
     st.subheader("⚙️ Filters")
@@ -225,7 +233,8 @@ with st.sidebar:
     )
     st.session_state.user_preferences['noise_preference'] = noise_level
     
-    open_now = st.checkbox("Open Now", value=True)
+    open_now = st.checkbox("Open Now", value=st.session_state.user_preferences.get('open_now', True))
+    st.session_state.user_preferences['open_now'] = open_now
     
     # Save preferences
     if st.button("Save Preferences"):
@@ -307,30 +316,27 @@ if prompt := st.chat_input("Ask me about local places..."):
     
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            
-            # --- Geocode the user location ---
-            user_location = st.session_state.user_preferences.get('location', None)
+            # Geocode user location (once)
+            geolocator = Nominatim(user_agent="spotlight_ai")
+            user_location_str = st.session_state.user_preferences.get("location", None)
             latitude, longitude = None, None
-            if user_location:
+            if user_location_str:
                 try:
-                    geolocator = Nominatim(user_agent="spotlight_ai")
-                    location = geolocator.geocode(user_location)
+                    location = geolocator.geocode(user_location_str)
                     if location:
                         latitude = location.latitude
                         longitude = location.longitude
                 except Exception as e:
                     st.warning(f"Geocoding failed: {e}")
-            
-            
-            # Geocode user location
-            geolocator = Nominatim(user_agent="spotlight_ai")
-            user_location_str = st.session_state.user_preferences.get("location", None)
-            latitude, longitude = None, None
-            if user_location_str:
-                location = geolocator.geocode(user_location_str)
-                if location:
-                    latitude = location.latitude
-                    longitude = location.longitude
+
+            # Active filters to send to the backend /chat endpoint
+            filters = {
+                "distance_miles": st.session_state.user_preferences.get("distance_miles", 5),
+                "price_range": st.session_state.user_preferences.get("price_range"),
+                "dietary": st.session_state.user_preferences.get("dietary"),
+                "noise_preference": st.session_state.user_preferences.get("noise_preference"),
+                "open_now": st.session_state.user_preferences.get("open_now", True),
+            }
 
             # Prepare request payload
             payload = {
@@ -340,7 +346,8 @@ if prompt := st.chat_input("Ask me about local places..."):
                 "latitude": latitude,
                 "longitude": longitude,
                 "update_preferences": None,
-                "conversation_id": None
+                "conversation_id": None,
+                "filters": filters,
             }
 
 
