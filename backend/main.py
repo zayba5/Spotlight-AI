@@ -1,4 +1,5 @@
 import os
+import random
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
@@ -477,15 +478,45 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
 		)
 	# messages
 	user_msg = models.Message(conversation_id=conversation_id, role="user", content=req.query)
+	def _to_citation(item: Dict[str, Any]) -> Dict[str, Any]:
+		metadata = item.get("metadata") or {}
+		doc_text = item.get("document") or ""
+
+		# Prefer explicit rating fields from metadata; support both DB (stars) and API (rating).
+		rating = metadata.get("rating")
+		if rating is None:
+			rating = metadata.get("stars")
+
+		review_count = metadata.get("review_count") or metadata.get("user_ratings_total")
+
+		# Heuristic: if this came from DB ingestion, the document may contain a
+		# "Sample reviews:" section; try to pull one random sentence from it.
+		random_review = None
+		if "Sample reviews:" in doc_text:
+			after = doc_text.split("Sample reviews:", 1)[1].strip()
+			sentences = [s.strip() for s in after.split(".") if s.strip()]
+			if sentences:
+				random_review = random.choice(sentences)
+				if not random_review.endswith("."):
+					random_review += "."
+		elif doc_text:
+			# Fallback: short snippet from the document as a pseudo‑review.
+			random_review = (doc_text[:220] + "...") if len(doc_text) > 220 else doc_text
+
+		return {
+			"id": item.get("id"),
+			"title": metadata.get("title") or metadata.get("name"),
+			"url": metadata.get("url"),
+			"rating": rating,
+			"review_count": review_count,
+			"random_review": random_review,
+		}
+
 	assistant_msg = models.Message(
 		conversation_id=conversation_id,
 		role="assistant",
 		content=answer,
-		citations=[{
-			"id": it["id"],
-			"title": it.get("metadata", {}).get("title"),
-			"url": it.get("metadata", {}).get("url"),
-		} for it in retrieved_items]
+		citations=[_to_citation(it) for it in retrieved_items],
 	)
 	db.add(user_msg)
 	db.add(assistant_msg)

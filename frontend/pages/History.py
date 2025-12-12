@@ -210,12 +210,12 @@ with tab2:
     # Display search history
     if st.session_state.user_preferences.get('search_history'):
         for idx, search in enumerate(st.session_state.user_preferences['search_history']):
+            results_text = f"{search.get('results', '?')} results found" if 'results' in search else ""
             st.markdown(f"""
             <div class="history-item">
-                <h4 style="margin: 0 0 5px 0; color: #2c3e50;">"{search['query']}"</h4>
+                <h4 style="margin: 0 0 5px 0; color: #2c3e50;">"{search.get('query', 'Unknown query')}"</h4>
                 <p style="margin: 5px 0; color: #7f8c8d; font-size: 14px;">
-                     {search['timestamp']} • 
-                     {search['results']} results found
+                     {search.get('timestamp', '')}{' • ' + results_text if results_text else ''}
                 </p>
             </div>
             """, unsafe_allow_html=True)
