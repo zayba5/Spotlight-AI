@@ -2,8 +2,7 @@ BACKEND_URL = "http://localhost:8000/chat"
 
 import streamlit as st
 import json
-from datetime import datetime
-import requests
+import os
 from datetime import datetime
 import requests
 from geopy.geocoders import Nominatim
@@ -18,6 +17,7 @@ st.set_page_config(
 
 # Top Navigation Bar (HTML + CSS)
 st.markdown("""
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
 
     /* --- REMOVE STREAMLIT DEFAULT TOP HEADER --- */
@@ -47,15 +47,97 @@ st.markdown("""
         filter: brightness(0) invert(1);
     }
 
-    .custom-top-nav input {
+    .custom-top-nav .search-wrapper {
+        position: relative;
         flex-grow: 1;
         max-width: 500px;
+        margin-left: 0;
+    }
+
+    .custom-top-nav .search-wrapper::before {
+        content: '🔍';
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 16px;
+        z-index: 1;
+        pointer-events: none;
+        filter: brightness(0) invert(1);
+    }
+
+    .custom-top-nav input {
+        width: 100%;
         height: 36px;
         border: none;
         border-radius: 18px;
-        padding: 0 16px;
+        padding: 0 16px 0 40px;
         background: #fff;
         outline: none;
+        font-size: 15px;
+        color: #333;
+    }
+
+    .custom-top-nav input::placeholder {
+        color: #999;
+    }
+
+    /* Navigation Icons Container in Top Bar */
+    .nav-icons-top {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        margin-left: auto;
+        height: 60px;
+    }
+
+    .nav-icon-top {
+        min-width: 112px;
+        height: 56px;
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer !important;
+        transition: all 0.2s ease;
+        font-size: 24px;
+        background: transparent;
+        border: none;
+        padding: 0;
+        margin: 0;
+        position: relative;
+        color: rgba(255, 255, 255, 0.8) !important;
+        border-radius: 8px;
+        text-decoration: none !important;
+        pointer-events: auto !important;
+        z-index: 100000 !important;
+    }
+
+    .nav-icon-top:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 1) !important;
+    }
+
+    .nav-icon-top.active {
+        color: rgba(255, 255, 255, 1) !important;
+    }
+
+    .nav-icon-top.active::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: calc(100% - 16px);
+        height: 3px;
+        background: rgba(255, 255, 255, 1);
+        border-radius: 3px 3px 0 0;
+    }
+
+    .nav-icon-top i {
+        font-size: 24px;
+        pointer-events: none;
+        color: inherit !important;
     }
 
     /* --- REMOVE ALL TOP SPACING FROM STREAMLIT --- */
@@ -67,6 +149,28 @@ st.markdown("""
     [data-testid="stSidebar"] {
         padding-top: 0 !important;
         margin-top: 30px !important;
+    }
+
+    /* Hide Streamlit's automatic sidebar navigation */
+    [data-testid="stSidebar"] [data-testid="stSidebarNav"],
+    [data-testid="stSidebar"] nav,
+    [data-testid="stSidebar"] [role="navigation"],
+    [data-testid="stSidebar"] ul[data-testid*="nav"],
+    [data-testid="stSidebar"] div[data-testid*="nav"],
+    [data-testid="stSidebar"] > div > div:first-child nav,
+    [data-testid="stSidebar"] > div > div:first-child ul {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
+    /* Hide sidebar navigation links */
+    [data-testid="stSidebar"] a[href*="Homepage"],
+    [data-testid="stSidebar"] a[href*="History"],
+    [data-testid="stSidebar"] a[href*="Maps"],
+    [data-testid="stSidebar"] a[href*="Profile"],
+    [data-testid="stSidebar"] a[href*="Settings"] {
+        display: none !important;
+        visibility: hidden !important;
     }
 
     .main .block-container {
@@ -158,13 +262,68 @@ st.markdown("""
         text-decoration: underline;
     }
 
-</style>
 
+</style>
+""", unsafe_allow_html=True)
+
+# Determine current page for highlighting
+current_file = os.path.basename(__file__)
+if current_file == "Homepage.py":
+    current_page_name = "homepage"
+else:
+    current_page_name = current_file.replace(".py", "").lower()
+
+# Check query params for page navigation - MUST BE FIRST
+query_params = st.query_params
+if 'nav' in query_params:
+    nav_page = query_params['nav']
+    current_file_name = os.path.basename(__file__)
+    
+    if nav_page == 'homepage' and current_file_name != "Homepage.py":
+        st.switch_page("Homepage.py")
+    elif nav_page == 'history' and current_file_name != "History.py":
+        st.switch_page("pages/History.py")
+    elif nav_page == 'maps' and current_file_name != "Maps.py":
+        st.switch_page("pages/Maps.py")
+    elif nav_page == 'profile' and current_file_name != "Profile.py":
+        st.switch_page("pages/Profile.py")
+    elif nav_page == 'settings' and current_file_name != "Settings.py":
+        st.switch_page("pages/Settings.py")
+
+# Top Navigation Bar with Icons - Using anchor tags for direct navigation
+nav_html = f"""
 <div class="custom-top-nav">
     <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/No_image_available_600_x_450.svg">
-    <input type="text" placeholder="Search Spotlight AI...">
+    <div class="search-wrapper">
+        <input type="text" placeholder="Search Spotlight AI...">
+    </div>
+    <div class="nav-icons-top">
+        <a href="/"  target="_self" class="nav-icon-top {'active' if current_page_name == 'homepage' else ''}" 
+           title="Homepage" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-home"></i>
+        </a>
+        <a href="/History" target="_self" class="nav-icon-top {'active' if current_page_name == 'history' else ''}" 
+           title="History" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-history"></i>
+        </a>
+        <a href="/Maps" target="_self" class="nav-icon-top {'active' if current_page_name == 'maps' else ''}" 
+           title="Maps" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-map-marked-alt"></i>
+        </a>
+        <a href="/Profile" target="_self" class="nav-icon-top {'active' if current_page_name == 'profile' else ''}" 
+           title="Profile" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-user"></i>
+        </a>
+        <a href="/Settings" target="_self" class="nav-icon-top {'active' if current_page_name == 'settings' else ''}" 
+           title="Settings" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-cog"></i>
+        </a>
+    </div>
 </div>
-""", unsafe_allow_html=True)
+"""
+st.markdown(nav_html, unsafe_allow_html=True)
+
+# No JavaScript needed - using anchor tags for direct navigation
 
 
 # Add a search bar at the top
@@ -189,10 +348,52 @@ if 'user_preferences' not in st.session_state:
         'liked_places': [],
         'search_history': []
     }
+# Hide Streamlit's automatic sidebar navigation with JavaScript
+st.markdown("""
+<script>
+(function() {
+    // Hide navigation elements in sidebar
+    const sidebar = document.querySelector('[data-testid="stSidebar"]');
+    if (sidebar) {
+        // Hide nav elements
+        const navElements = sidebar.querySelectorAll('nav, [role="navigation"], [data-testid*="nav"], ul, a[href*="Homepage"], a[href*="History"], a[href*="Maps"], a[href*="Profile"], a[href*="Settings"]');
+        navElements.forEach(el => {
+            if (el.textContent && (el.textContent.includes('Homepage') || el.textContent.includes('History') || el.textContent.includes('Maps') || el.textContent.includes('Profile') || el.textContent.includes('Settings'))) {
+                if (!el.closest('[class*="Preferences"]')) {
+                    el.style.display = 'none';
+                    el.style.visibility = 'hidden';
+                }
+            }
+        });
+        
+        // Also hide first child if it's navigation
+        const firstChild = sidebar.querySelector('> div > div:first-child');
+        if (firstChild && (firstChild.textContent.includes('Homepage') || firstChild.textContent.includes('History') || firstChild.textContent.includes('Maps'))) {
+            firstChild.style.display = 'none';
+        }
+    }
+    
+    // Run again after a short delay to catch dynamically loaded elements
+    setTimeout(() => {
+        const sidebar = document.querySelector('[data-testid="stSidebar"]');
+        if (sidebar) {
+            const navElements = sidebar.querySelectorAll('a, button, div');
+            navElements.forEach(el => {
+                const text = el.textContent || '';
+                if ((text.includes('Homepage') || text.includes('History') || text.includes('Maps') || text.includes('Profile') || text.includes('Settings')) && 
+                    !el.closest('[class*="Preferences"]') && 
+                    !el.closest('[class*="nav-icon"]')) {
+                    el.style.display = 'none';
+                }
+            });
+        }
+    }, 100);
+})();
+</script>
+""", unsafe_allow_html=True)
 
 # Sidebar - Preferences and Filters
 with st.sidebar:
-    # Remove all the buttons here — no navigation buttons at all
 
     st.header("**Preferences:**")
     
