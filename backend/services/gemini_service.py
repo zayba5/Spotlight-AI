@@ -1,3 +1,4 @@
+import json
 import os
 from typing import Any, Dict, List, Optional
 
@@ -21,7 +22,6 @@ class GeminiServiceError(RuntimeError):
 class GeminiConfigError(GeminiServiceError):
 	"""Raised when Gemini configuration (like API key) is missing."""
 
-client = genai.Client()
 
 def _get_api_key() -> str:
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
@@ -172,3 +172,64 @@ def build_user_prompt(query: str, retrieved: List[Dict[str, Any]]) -> str:
 		"Prioritize the user's preferences. Be specific about quietness, vegetarian options, budget, and distance when available."
 	)
 	return "\n".join(lines)
+
+
+def plan_data_sources(query: str, location_hint: Optional[str] = None) -> Dict[str, Any]:
+	"""
+	Use Gemini to decide which data sources to use (Chroma vs Google Places) for a given query.
+
+	Returns a dict like:
+	{
+		"use_chroma": true,
+		"use_google_places": true,
+		"google_places_query": "coffee shops in San Francisco",
+		"google_places_location": "37.7749,-122.4194",
+		"google_places_radius": 5000
+	}
+
+	If planning fails for any reason, callers should fall back to a sensible default.
+	"""
+	client = _get_client()
+
+	system_instruction = (
+		"You are a routing planner for a local recommendations assistant. "
+		"You decide which data sources to use based on the user's query and optional location hint. "
+		"Available sources: 'chroma' (local vector store with detailed business & review data) and "
+		"'google_places' (live Google Places API). "
+		"Return ONLY a compact JSON object with keys: use_chroma (bool), use_google_places (bool), "
+		"google_places_query (string), google_places_location (string or null), google_places_radius (integer meters). "
+		"Prefer using both when unsure. Use the user's wording directly for google_places_query when appropriate."
+	)
+
+	content = f"User query: {query}\nLocation hint: {location_hint or 'none'}"
+
+	try:
+		response = client.models.generate_content(
+			model=GEMINI_GENERATE_MODEL,
+			contents=content,
+			config=types.GenerateContentConfig(system_instruction=system_instruction),
+		)
+	except Exception as exc:  # pragma: no cover - SDK specific errors
+		raise GeminiServiceError(f"Gemini routing plan request failed: {exc}") from exc
+
+	text = _ensure_text_from_response(response).strip()
+	if not text:
+		raise GeminiServiceError("Gemini returned an empty routing plan.")
+
+	# Try to parse JSON from the response; if it fails, wrap it as best-effort.
+	try:
+		plan = json.loads(text)
+	except json.JSONDecodeError as exc:
+		raise GeminiServiceError(f"Gemini routing plan was not valid JSON: {text}") from exc
+
+	# Basic normalization / defaults
+	if not isinstance(plan, dict):
+		raise GeminiServiceError("Gemini routing plan was not a JSON object.")
+
+	plan.setdefault("use_chroma", True)
+	plan.setdefault("use_google_places", False)
+	plan.setdefault("google_places_query", query)
+	plan.setdefault("google_places_location", location_hint)
+	plan.setdefault("google_places_radius", 5000)
+
+	return plan
