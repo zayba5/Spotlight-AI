@@ -1,6 +1,12 @@
+BACKEND_URL = "http://localhost:8000/chat"
+
 import streamlit as st
 import json
 from datetime import datetime
+import requests
+from datetime import datetime
+import requests
+from geopy.geocoders import Nominatim
 
 # Page config
 st.set_page_config(
@@ -299,70 +305,84 @@ if prompt := st.chat_input("Ask me about local places..."):
     with st.chat_message("user"):
         st.markdown(prompt)
     
-    # Generate AI response (mock for now - you'll replace with your RAG pipeline)
     with st.chat_message("assistant"):
-        with st.spinner("Searching local places..."):
-            # TODO: Replace with your actual RAG pipeline
-            # response = your_rag_pipeline(prompt, st.session_state.user_preferences)
+        with st.spinner("Thinking..."):
             
-            # Mock response for demonstration
-            response_text = f"Based on your query '{prompt}' and preferences, here are my top recommendations:"
-            st.markdown(response_text)
+            # --- Geocode the user location ---
+            user_location = st.session_state.user_preferences.get('location', None)
+            latitude, longitude = None, None
+            if user_location:
+                try:
+                    geolocator = Nominatim(user_agent="spotlight_ai")
+                    location = geolocator.geocode(user_location)
+                    if location:
+                        latitude = location.latitude
+                        longitude = location.longitude
+                except Exception as e:
+                    st.warning(f"Geocoding failed: {e}")
             
-            # Mock place data (replace with actual Yelp/Google API data)
-            mock_places = [
-                {
-                    "name": "Blue Bottle Coffee",
-                    "rating": 4.5,
-                    "reviews": 312,
-                    "price": "$$",
-                    "description": "Minimalist cafe with excellent espresso, plenty of outlets, and a quiet atmosphere perfect for working.",
-                    "citation": "Great place to work! Quiet, fast WiFi, and the coffee is amazing.",
-                    "lat": 37.3352,
-                    "lng": -121.8811
-                },
-                {
-                    "name": "Cafe Frascati",
-                    "rating": 4.3,
-                    "reviews": 428,
-                    "price": "$$",
-                    "description": "Cozy European-style cafe with outdoor seating and reliable WiFi. Known for their pastries.",
-                    "citation": "Love this spot for morning work sessions. Never too crowded and staff is friendly.",
-                    "lat": 37.3318,
-                    "lng": -121.8906
-                }
-            ]
             
-            # Display places
-            for place in mock_places:
-                st.markdown(f"""
-                <div class="place-card">
-                    <div class="place-header">{place['name']}</div>
-                    <div class="place-rating">⭐ {place['rating']} ({place['reviews']} reviews) • {place['price']}</div>
-                    <p>{place['description']}</p>
-                    <div class="citation">💬 "{place['citation']}" - Yelp Review</div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                btn_cols = st.columns(3)
-                with btn_cols[0]:
-                    if st.button(f"📍 Directions", key=f"dir_{place['name']}_new"):
-                        st.info(f"Opening directions to {place['name']}...")
-                with btn_cols[1]:
-                    if st.button(f"❤️ Save", key=f"save_{place['name']}_new"):
-                        if place['name'] not in st.session_state.user_preferences['liked_places']:
-                            st.session_state.user_preferences['liked_places'].append(place['name'])
-                            st.success(f"Saved {place['name']}!")
-                with btn_cols[2]:
-                    if st.button(f"ℹ️ More Info", key=f"info_{place['name']}_new"):
-                        st.info(f"Opening Yelp page for {place['name']}...")
-            
-            # Add assistant message to history
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": response_text,
-                "places": mock_places
-            })
+            # Geocode user location
+            geolocator = Nominatim(user_agent="spotlight_ai")
+            user_location_str = st.session_state.user_preferences.get("location", None)
+            latitude, longitude = None, None
+            if user_location_str:
+                location = geolocator.geocode(user_location_str)
+                if location:
+                    latitude = location.latitude
+                    longitude = location.longitude
+
+            # Prepare request payload
+            payload = {
+                "user_id": st.session_state.user_data["email"],
+                "query": prompt,
+                "location_hint": user_location_str,
+                "latitude": latitude,
+                "longitude": longitude,
+                "update_preferences": None,
+                "conversation_id": None
+            }
+
+
+            try:
+                # Send request to backend
+                response = requests.post(BACKEND_URL, json=payload, timeout=60)
+
+                if response.status_code != 200:
+                    st.error(f"Backend error: {response.text}")
+                    assistant_answer = "Sorry, something went wrong with the server."
+                    places = []
+                else:
+                    data = response.json()
+                    assistant_answer = data.get("answer", "")
+                    citations = data.get("citations", [])
+                    places = []
+
+                    # Extract structured place info (if any)
+                    for c in citations:
+                        if c.get("title"):
+                            places.append({
+                                "name": c["title"],
+                                "rating": c.get("rating", "?"),
+                                "reviews": c.get("review_count", "?"),
+                                "price": c.get("price", "?"),
+                                "description": c.get("document", ""),
+                                "citation": c.get("url", ""),
+                            })
+
+                # Display assistant text
+                st.markdown(assistant_answer)
+
+                # Save assistant message
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": assistant_answer,
+                    "places": places
+                })
+
+            except Exception as e:
+                st.error(f"Unable to contact backend: {e}")
+
 
 # Footer
 st.divider()
