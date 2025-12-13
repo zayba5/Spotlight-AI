@@ -12,6 +12,172 @@ st.set_page_config(
 # Custom CSS
 st.markdown("""
 <style>
+
+    /* --- REMOVE STREAMLIT DEFAULT TOP HEADER --- */
+    header[data-testid="stHeader"] {
+        visibility: hidden !important;
+        height: 0px !important;
+    }
+
+    /* --- FIXED TOP NAV BAR --- */
+    .custom-top-nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 60px;
+        background-color: #f44336 !important;
+        border-bottom: 1px solid #e53935;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        z-index: 99999 !important;
+    }
+
+    .custom-top-nav img {
+        height: 32px;
+        margin-right: 16px;
+        filter: brightness(0) invert(1);
+    }
+
+    .custom-top-nav .search-wrapper {
+        position: relative;
+        flex-grow: 1;
+        max-width: 500px;
+        margin-left: 0;
+    }
+
+    .custom-top-nav .search-wrapper::before {
+        content: '🔍';
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 16px;
+        z-index: 1;
+        pointer-events: none;
+        filter: brightness(0) invert(1);
+    }
+
+    .custom-top-nav input {
+        width: 100%;
+        height: 36px;
+        border: none;
+        border-radius: 18px;
+        padding: 0 16px 0 40px;
+        background: #fff;
+        outline: none;
+        font-size: 15px;
+        color: #333;
+    }
+
+    .custom-top-nav input::placeholder {
+        color: #999;
+    }
+
+    /* Navigation Icons Container in Top Bar */
+    .nav-icons-top {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        margin-left: auto;
+        height: 60px;
+    }
+
+    .nav-icon-top {
+        min-width: 112px;
+        height: 56px;
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer !important;
+        transition: all 0.2s ease;
+        font-size: 24px;
+        background: transparent;
+        border: none;
+        padding: 0;
+        margin: 0;
+        position: relative;
+        color: rgba(255, 255, 255, 0.8) !important;
+        border-radius: 8px;
+        text-decoration: none !important;
+        pointer-events: auto !important;
+        z-index: 100000 !important;
+    }
+
+    .nav-icon-top:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 1) !important;
+    }
+
+    .nav-icon-top.active {
+        color: rgba(255, 255, 255, 1) !important;
+    }
+
+    .nav-icon-top.active::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: calc(100% - 16px);
+        height: 3px;
+        background: rgba(255, 255, 255, 1);
+        border-radius: 3px 3px 0 0;
+    }
+
+    .nav-icon-top i {
+        font-size: 24px;
+        pointer-events: none;
+        color: inherit !important;
+    }
+
+    /* --- REMOVE ALL TOP SPACING FROM STREAMLIT --- */
+    [data-testid="stAppViewContainer"] {
+        padding-top: 0 !important;
+        margin-top: 30px !important;
+    }
+
+    [data-testid="stSidebar"] {
+        padding-top: 0 !important;
+        margin-top: 30px !important;
+    }
+
+    /* Hide Streamlit's automatic sidebar navigation */
+    [data-testid="stSidebar"] [data-testid="stSidebarNav"],
+    [data-testid="stSidebar"] nav,
+    [data-testid="stSidebar"] [role="navigation"],
+    [data-testid="stSidebar"] ul[data-testid*="nav"],
+    [data-testid="stSidebar"] div[data-testid*="nav"],
+    [data-testid="stSidebar"] > div > div:first-child nav,
+    [data-testid="stSidebar"] > div > div:first-child ul {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
+    /* Hide sidebar navigation links */
+    [data-testid="stSidebar"] a[href*="Homepage"],
+    [data-testid="stSidebar"] a[href*="History"],
+    [data-testid="stSidebar"] a[href*="Maps"],
+    [data-testid="stSidebar"] a[href*="Profile"],
+    [data-testid="stSidebar"] a[href*="Settings"] {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
+    .main .block-container {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+
+    /* --- THE MISSING RULE (this one fixes your last gap!!) --- */
+    .main > div:nth-child(1) {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+
+    /* Result cards */
     .result-card {
         border: 1px solid #e0e0e0;
         border-radius: 12px;
@@ -47,6 +213,10 @@ st.markdown("""
     .badge-open {
         background: #d4edda;
         color: #155724;
+    }
+    .badge-closed {
+        background: #f8d7da;
+        color: #721c24;
     }
     .badge-price {
         background: #fff3cd;

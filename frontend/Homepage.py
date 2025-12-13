@@ -475,29 +475,7 @@ with st.sidebar:
 # Main content area
 st.title("🔦 Spotlight AI")
 st.caption("Your personal local search assistant")
-
-# Suggested prompts for new users
-if len(st.session_state.messages) == 0:
-    st.markdown("### 💬 Try asking me:")
-    prompt_cols = st.columns(2)
-    with prompt_cols[0]:
-        if st.button("🍕 Best pizza near me"):
-            user_query = "Best pizza near me"
-            st.session_state.messages.append({"role": "user", "content": user_query})
-            st.rerun()
-        if st.button("☕️ Quiet coffee shops with WiFi"):
-            user_query = "Quiet coffee shops with WiFi"
-            st.session_state.messages.append({"role": "user", "content": user_query})
-            st.rerun()
-    with prompt_cols[1]:
-        if st.button("🍜 Late night food options"):
-            user_query = "Late night food options"
-            st.session_state.messages.append({"role": "user", "content": user_query})
-            st.rerun()
-        if st.button("🥗 Healthy lunch under $15"):
-            user_query = "Healthy lunch under $15"
-            st.session_state.messages.append({"role": "user", "content": user_query})
-            st.rerun()
+st.caption("⚠️ *AI responses are not guaranteed to be 100% accurate. Please verify information directly with businesses.*")
 
 # Display chat messages
 for message in st.session_state.messages:
@@ -511,7 +489,116 @@ for message in st.session_state.messages:
 
 
 # Chat input
-if prompt := st.chat_input("Ask me about local places..."):
+placeholder_text = "Ask me about local places..."
+
+# JavaScript to populate chat input with pending query - must run BEFORE chat_input
+if 'pending_query' in st.session_state and st.session_state.pending_query:
+    pending_text = st.session_state.pending_query
+    placeholder_text = pending_text  # Show as placeholder too
+    st.markdown(f"""
+    <script>
+    (function() {{
+        const pendingText = {json.dumps(pending_text)};
+        let populated = false;
+        
+        function populateChatInput() {{
+            if (populated) return true;
+            
+            // Try multiple selectors for Streamlit chat input
+            const selectors = [
+                'textarea[data-testid*="stChatInputTextArea"]',
+                'textarea[data-testid*="stChatInput"]',
+                'div[data-testid*="stChatInput"] textarea',
+                'textarea[placeholder*="Ask me"]',
+                'textarea[placeholder*="local"]',
+                'textarea[aria-label*="chat"]',
+                'textarea[aria-label*="message"]'
+            ];
+            
+            let chatInput = null;
+            for (const selector of selectors) {{
+                const elements = document.querySelectorAll(selector);
+                for (let el of elements) {{
+                    if (el.tagName === 'TEXTAREA' || el.querySelector('textarea')) {{
+                        chatInput = el.tagName === 'TEXTAREA' ? el : el.querySelector('textarea');
+                        if (chatInput) break;
+                    }}
+                }}
+                if (chatInput) break;
+            }}
+            
+            if (chatInput && chatInput.tagName === 'TEXTAREA') {{
+                // Make sure it's editable
+                chatInput.readOnly = false;
+                chatInput.disabled = false;
+                
+                // Set the value
+                chatInput.value = pendingText;
+                
+                // Trigger events to ensure Streamlit recognizes the change
+                const events = ['input', 'change', 'keyup', 'keydown'];
+                events.forEach(eventType => {{
+                    const event = new Event(eventType, {{ bubbles: true, cancelable: true }});
+                    chatInput.dispatchEvent(event);
+                }});
+                
+                // Also try setting it via the value property directly
+                Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(chatInput, pendingText);
+                
+                // Focus the input and set cursor to end
+                chatInput.focus();
+                if (chatInput.setSelectionRange) {{
+                    chatInput.setSelectionRange(pendingText.length, pendingText.length);
+                }}
+                
+                // Select all text so user can easily replace it
+                setTimeout(() => {{
+                    if (chatInput.setSelectionRange) {{
+                        chatInput.setSelectionRange(0, pendingText.length);
+                    }}
+                }}, 50);
+                
+                populated = true;
+                return true;
+            }}
+            return false;
+        }}
+        
+        // Use MutationObserver to watch for chat input to appear
+        const observer = new MutationObserver(function(mutations) {{
+            if (populateChatInput()) {{
+                observer.disconnect();
+            }}
+        }});
+        
+        // Start observing
+        observer.observe(document.body, {{
+            childList: true,
+            subtree: true,
+            attributes: false
+        }});
+        
+        // Try immediately and with delays
+        populateChatInput();
+        setTimeout(populateChatInput, 50);
+        setTimeout(populateChatInput, 100);
+        setTimeout(populateChatInput, 200);
+        setTimeout(populateChatInput, 500);
+        setTimeout(() => {{
+            populateChatInput();
+            observer.disconnect();
+        }}, 1000);
+    }})();
+    </script>
+    """, unsafe_allow_html=True)
+
+prompt = st.chat_input(placeholder_text)
+
+if prompt:
+    # Clear pending query if it was used
+    if 'pending_query' in st.session_state:
+        del st.session_state.pending_query
+    
     # Add to search history
     st.session_state.user_preferences['search_history'].append({
         'query': prompt,
@@ -605,4 +692,3 @@ if prompt := st.chat_input("Ask me about local places..."):
 
 # Footer
 st.divider()
-#st.caption("🔦 Spotlight AI • Powered by RAG + Yelp + Google Places • Built by Howard, Zayba, and Tiana")
