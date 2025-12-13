@@ -146,11 +146,16 @@ def generate_response(system_prompt: str, user_prompt: str) -> str:
 	return text
 
 
-def build_system_prompt(preference_summary: str) -> str:
+def build_system_prompt(preference_summary: str, filter_summary: Optional[str] = None) -> str:
+	"""
+	Build the system prompt for Gemini, including long‑term user preferences and
+	the current request‑scoped filters (price, distance, open‑now, etc.).
+	"""
 	return (
 		"You are Spotlight-AI, a local recommendations assistant. You answer with concise, clear suggestions "
 		"based on retrieved reviews, menus, and ratings. Always include relevant citations as [n] referencing items provided. "
-		f"Personalization context: {preference_summary or 'none'}"
+		f"Personalization context: {preference_summary or 'none'}. "
+		f"Active filters: {filter_summary or 'none'}."
 	)
 
 
@@ -174,7 +179,11 @@ def build_user_prompt(query: str, retrieved: List[Dict[str, Any]]) -> str:
 	return "\n".join(lines)
 
 
-def plan_data_sources(query: str, location_hint: Optional[str] = None) -> Dict[str, Any]:
+def plan_data_sources(
+	query: str,
+	location_hint: Optional[str] = None,
+	filters: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
 	"""
 	Use Gemini to decide which data sources to use (Chroma vs Google Places) for a given query.
 
@@ -193,15 +202,24 @@ def plan_data_sources(query: str, location_hint: Optional[str] = None) -> Dict[s
 
 	system_instruction = (
 		"You are a routing planner for a local recommendations assistant. "
-		"You decide which data sources to use based on the user's query and optional location hint. "
-		"Available sources: 'chroma' (local vector store with detailed business & review data) and "
+		"You decide which data sources to use based on the user's query, optional location hint, "
+		"and any active UI filters (distance, price range, dietary, open-now, etc.). "
+		"Available sources: 'chroma' (local vector store with detailed business & review data, mostly from PostgreSQL) and "
 		"'google_places' (live Google Places API). "
+		"Default behavior: prioritize using 'google_places' for fresh local search results whenever a location is known, "
+		"optionally augmenting with 'chroma' when additional historical/review context would help. "
 		"Return ONLY a compact JSON object with keys: use_chroma (bool), use_google_places (bool), "
 		"google_places_query (string), google_places_location (string or null), google_places_radius (integer meters). "
-		"Prefer using both when unsure. Use the user's wording directly for google_places_query when appropriate."
+		"Prefer google_places=True; set use_chroma=True only when it clearly adds value (e.g., deeper review history, "
+		"saved venues, or analytics). Use the user's wording directly for google_places_query when appropriate."
 	)
 
-	content = f"User query: {query}\nLocation hint: {location_hint or 'none'}"
+	filters_str = json.dumps(filters or {}, ensure_ascii=False)
+	content = (
+		f"User query: {query}\n"
+		f"Location hint: {location_hint or 'none'}\n"
+		f"Active filters (JSON): {filters_str}"
+	)
 
 	try:
 		response = client.models.generate_content(
@@ -226,8 +244,9 @@ def plan_data_sources(query: str, location_hint: Optional[str] = None) -> Dict[s
 	if not isinstance(plan, dict):
 		raise GeminiServiceError("Gemini routing plan was not a JSON object.")
 
-	plan.setdefault("use_chroma", True)
-	plan.setdefault("use_google_places", False)
+	# Prefer Google Places by default; Chroma augments when helpful.
+	plan.setdefault("use_chroma", False)
+	plan.setdefault("use_google_places", True)
 	plan.setdefault("google_places_query", query)
 	plan.setdefault("google_places_location", location_hint)
 	plan.setdefault("google_places_radius", 5000)

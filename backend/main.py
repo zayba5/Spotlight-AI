@@ -1,4 +1,7 @@
 import os
+import random
+import re
+
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
@@ -108,6 +111,8 @@ class ChatRequest(BaseModel):
 	longitude: Optional[float] = None
 	update_preferences: Optional[Dict[str, str]] = None
 	conversation_id: Optional[int] = None
+	# Optional structured filters coming from the frontend UI (price, distance, etc.).
+	filters: Optional[Dict[str, Any]] = None
 
 
 class ChatResponse(BaseModel):
@@ -279,12 +284,33 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
 	if not req.query or not req.query.strip():
 		raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Query text is required.")
 
-	# Ensure user record and update preferences if provided
+	# Ensure user record and update long‑term preferences if provided
 	user = get_or_create_user(db, external_user_id=req.user_id)
 	if req.update_preferences:
 		set_user_preferences(db, user.id, req.update_preferences)
 	prefs = get_user_preferences(db, user.id)
 	pref_summary = summarize_preferences(prefs)
+
+	# Short-lived, request-scoped filters from the frontend (price range, distance, etc.).
+	active_filters: Dict[str, Any] = req.filters or {}
+
+	def _summarize_filters(filters: Dict[str, Any]) -> str:
+		if not filters:
+			return "None."
+		parts = []
+		if "distance_miles" in filters and filters.get("distance_miles") is not None:
+			parts.append(f"distance ≤ {filters['distance_miles']} miles")
+		if "price_range" in filters and filters.get("price_range"):
+			parts.append(f"price range {filters['price_range']}")
+		if "dietary" in filters and filters.get("dietary"):
+			parts.append(f"dietary: {filters['dietary']}")
+		if "noise_preference" in filters and filters.get("noise_preference"):
+			parts.append(f"noise: {filters['noise_preference']}")
+		if "open_now" in filters:
+			parts.append("open now only" if filters["open_now"] else "include closed places")
+		return "; ".join(str(p) for p in parts) or "None."
+
+	filter_summary = _summarize_filters(active_filters)
 
 	# Derive a precise "lat,lng" string if available for downstream services
 	lat_lng_str: Optional[str] = None
@@ -293,7 +319,7 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
 
 	# Decide which data sources to use (Chroma vs Google Places)
 	try:
-		plan = plan_data_sources(req.query, lat_lng_str or req.location_hint)
+		plan = plan_data_sources(req.query, lat_lng_str or req.location_hint, active_filters)
 	except GeminiServiceError:
 		# Fallback: always use Chroma only
 		plan = {
@@ -306,46 +332,39 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
 
 	retrieved_items: List[Dict[str, Any]] = []
 
-	# Retrieve from Chroma if requested by the routing plan
-	if plan.get("use_chroma", True):
-		client = get_chroma_client()
-		col = get_or_create_collection(client)
-		try:
-			# location_hint is used only to slightly bias semantic retrieval; prefer human-readable hints
-			location_text = req.location_hint or ""
-			query_embedding = get_embedding(req.query + (f" {location_text}" if location_text else ""))
-		except GeminiConfigError as exc:
-			raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
-		except GeminiServiceError as exc:
-			raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+	# Build a human-readable filter text to bias both Google Places and Chroma retrieval.
+	filter_text_parts = []
+	if active_filters.get("open_now"):
+		filter_text_parts.append("open now")
+	if active_filters.get("price_range"):
+		filter_text_parts.append(f"price range {active_filters['price_range']}")
+	if active_filters.get("dietary"):
+		filter_text_parts.append(f"dietary preferences {active_filters['dietary']}")
+	if active_filters.get("noise_preference"):
+		filter_text_parts.append(f"noise level {active_filters['noise_preference']}")
+	filter_hint = ", ".join(str(p) for p in filter_text_parts)
 
-		if not query_embedding:
-			raise HTTPException(
-				status_code=status.HTTP_400_BAD_REQUEST,
-				detail="Unable to generate embedding for the provided query.",
-			)
-
-		try:
-			results = col.query(query_embeddings=[query_embedding], n_results=8)
-		except Exception as exc:  # pragma: no cover - chroma internal failure
-			raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Vector search failed.") from exc
-
-		if results and results.get("ids"):
-			for i in range(len(results["ids"][0])):
-				item = {
-					"id": results["ids"][0][i],
-					"document": results["documents"][0][i],
-					"metadata": results["metadatas"][0][i],
-				}
-				retrieved_items.append(item)
-
-	# Optionally augment with live Google Places results
+	# Optionally query live Google Places results *first* (prioritized over Postgres/Chroma).
 	if plan.get("use_google_places"):
 		try:
+			# Build a slightly enriched query string that bakes in active filters.
+			google_query = plan.get("google_places_query") or req.query
+			if filter_hint:
+				google_query = f"{google_query} ({filter_hint})"
+
+			# Prefer an explicit distance from the frontend filters when available.
+			radius_meters: int = int(plan.get("google_places_radius") or 5000)
+			if "distance_miles" in active_filters and active_filters["distance_miles"]:
+				try:
+					radius_meters = int(float(active_filters["distance_miles"]) * 1609.34)
+				except (TypeError, ValueError):
+					# Ignore bad client-provided values and fall back to the planned radius.
+					radius_meters = int(plan.get("google_places_radius") or 5000)
+
 			places = search_places(
-				query=plan.get("google_places_query") or req.query,
+				query=google_query,
 				location=plan.get("google_places_location") or lat_lng_str or req.location_hint,
-				radius=int(plan.get("google_places_radius") or 5000),
+				radius=max(1, min(50000, radius_meters)),
 				max_results=10,
 			)
 		except PlacesConfigError as exc:
@@ -391,8 +410,48 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
 				}
 			)
 
+	# Retrieve from Chroma (Postgres/embeddings) if requested by the routing plan,
+	# after live Google Places, so that live data is prioritized.
+	if plan.get("use_chroma", True):
+		client = get_chroma_client()
+		col = get_or_create_collection(client)
+		try:
+			# location_hint is used only to slightly bias semantic retrieval; prefer human-readable hints
+			location_text = req.location_hint or ""
+			query_text = req.query
+			if location_text:
+				query_text += f" near {location_text}"
+			if filter_hint:
+				query_text += f" with filters: {filter_hint}"
+
+			query_embedding = get_embedding(query_text)
+		except GeminiConfigError as exc:
+			raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+		except GeminiServiceError as exc:
+			raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+		if not query_embedding:
+			raise HTTPException(
+				status_code=status.HTTP_400_BAD_REQUEST,
+				detail="Unable to generate embedding for the provided query.",
+			)
+
+		try:
+			results = col.query(query_embeddings=[query_embedding], n_results=8)
+		except Exception as exc:  # pragma: no cover - chroma internal failure
+			raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Vector search failed.") from exc
+
+		if results and results.get("ids"):
+			for i in range(len(results["ids"][0])):
+				item = {
+					"id": results["ids"][0][i],
+					"document": results["documents"][0][i],
+					"metadata": results["metadatas"][0][i],
+				}
+				retrieved_items.append(item)
+
 	# Build prompt and call Gemini
-	system_prompt = build_system_prompt(pref_summary)
+	system_prompt = build_system_prompt(pref_summary, filter_summary)
 	user_prompt = build_user_prompt(req.query, retrieved_items)
 	try:
 		answer = generate_response(system_prompt, user_prompt)
@@ -421,21 +480,90 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
 		)
 	# messages
 	user_msg = models.Message(conversation_id=conversation_id, role="user", content=req.query)
+	def _to_citation(item: Dict[str, Any]) -> Dict[str, Any]:
+		metadata = item.get("metadata") or {}
+		doc_text = item.get("document") or ""
+
+		# Prefer explicit rating fields from metadata; support both DB (stars) and API (rating).
+		rating = metadata.get("rating")
+		if rating is None:
+			rating = metadata.get("stars")
+
+		review_count = metadata.get("review_count") or metadata.get("user_ratings_total")
+
+		# Heuristic: if this came from DB ingestion, the document may contain a
+		# "Sample reviews:" section; try to pull one random sentence from it.
+		random_review = None
+		if "Sample reviews:" in doc_text:
+			after = doc_text.split("Sample reviews:", 1)[1].strip()
+			sentences = [s.strip() for s in after.split(".") if s.strip()]
+			if sentences:
+				random_review = random.choice(sentences)
+				if not random_review.endswith("."):
+					random_review += "."
+		elif doc_text:
+			# Fallback: short snippet from the document as a pseudo‑review.
+			random_review = (doc_text[:220] + "...") if len(doc_text) > 220 else doc_text
+
+		return {
+			"id": item.get("id"),
+			"title": metadata.get("title") or metadata.get("name"),
+			"url": metadata.get("url"),
+			"rating": rating,
+			"review_count": review_count,
+			"random_review": random_review,
+		}
+
+	# Function to parse LLM text into structured citations
+	def parse_llm_output_to_citations(answer_text: str):
+		"""
+		Parse LLM output into structured citations.
+		Removes any leading *, •, - and whitespace from each line.
+		"""
+		citations = []
+		lines = [line.strip() for line in answer_text.splitlines() if line.strip()]
+		
+		for i, line in enumerate(lines):
+			# Skip obvious intro lines
+			if line.lower().startswith("based on") or line.lower().startswith("these suggestions"):
+				continue
+			
+			# Remove leading bullets/stars/dashes and any spaces following them
+			line = re.sub(r"^[\*\•\-]+\s*", "", line)
+
+			# Only parse lines with a colon
+			if ":" in line:
+				title, desc = line.split(":", 1)
+				# Skip lines where title is too long or clearly not a business
+				if len(title) > 100:
+					continue
+				citations.append({
+					"id": f"llm_{i}",
+					"title": title.strip(),
+					"rating": None,
+					"review_count": None,
+					"random_review": desc.strip(),
+				})
+		return citations
+
+
+
+	# Use retrieved_items if available; otherwise parse LLM text
+	if retrieved_items:
+		citations = [_to_citation(it) for it in retrieved_items]
+	else:
+		citations = parse_llm_output_to_citations(answer)
+
 	assistant_msg = models.Message(
 		conversation_id=conversation_id,
 		role="assistant",
 		content=answer,
-		citations=[{
-			"id": it["id"],
-			"title": it.get("metadata", {}).get("title"),
-			"url": it.get("metadata", {}).get("url"),
-		} for it in retrieved_items]
+		citations=citations,
 	)
 	db.add(user_msg)
 	db.add(assistant_msg)
 	db.commit()
 
-	citations = assistant_msg.citations or []
 	return ChatResponse(answer=answer, citations=citations, conversation_id=conversation_id)
 
 
