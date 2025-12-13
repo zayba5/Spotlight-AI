@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import json
+import os
 
 # Page config
 st.set_page_config(
@@ -9,8 +10,9 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom CSS
+# Top Navigation Bar (HTML + CSS) - Same as Homepage
 st.markdown("""
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
 
     /* --- REMOVE STREAMLIT DEFAULT TOP HEADER --- */
@@ -140,9 +142,8 @@ st.markdown("""
     }
 
     [data-testid="stSidebar"] {
-        display: none !important;
-        visibility: hidden !important;
-        width: 0 !important;
+        padding-top: 0 !important;
+        margin-top: 30px !important;
     }
 
     /* Hide Streamlit's automatic sidebar navigation */
@@ -170,9 +171,6 @@ st.markdown("""
     .main .block-container {
         padding-top: 0 !important;
         margin-top: 0 !important;
-        max-width: 100% !important;
-        padding-left: 2rem !important;
-        padding-right: 2rem !important;
     }
 
     /* --- THE MISSING RULE (this one fixes your last gap!!) --- */
@@ -220,6 +218,73 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+# Determine current page for highlighting
+current_file = os.path.basename(__file__)
+if current_file == "Homepage.py":
+    current_page_name = "homepage"
+elif current_file == "History.py":
+    current_page_name = "history"
+elif current_file == "Maps.py":
+    current_page_name = "maps"
+elif current_file == "Profile.py":
+    current_page_name = "profile"
+elif current_file == "Settings.py":
+    current_page_name = "settings"
+else:
+    current_page_name = current_file.replace(".py", "").lower()
+
+# Check query params for page navigation - MUST BE FIRST
+query_params = st.query_params
+if 'nav' in query_params:
+    nav_page = query_params['nav']
+    current_file_name = os.path.basename(__file__)
+    
+    if nav_page == 'homepage':
+        st.switch_page("../Homepage.py")
+    elif nav_page == 'history':
+        # Already on history page - clear the nav param
+        if 'nav' in st.query_params:
+            del st.query_params['nav']
+    elif nav_page == 'maps' and current_file_name != "Maps.py":
+        st.switch_page("Maps.py")
+    elif nav_page == 'profile' and current_file_name != "Profile.py":
+        st.switch_page("Profile.py")
+    elif nav_page == 'settings' and current_file_name != "Settings.py":
+        st.switch_page("Settings.py")
+
+# Top Navigation Bar with Icons - Using anchor tags for direct navigation
+nav_html = f"""
+<div class="custom-top-nav">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/No_image_available_600_x_450.svg">
+    <div class="search-wrapper">
+        <input type="text" placeholder="Search Spotlight AI...">
+    </div>
+    <div class="nav-icons-top">
+        <a href="/" target="_self" class="nav-icon-top {'active' if current_page_name == 'homepage' else ''}" 
+           title="Homepage" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-home"></i>
+        </a>
+        <a href="/History" target="_self" class="nav-icon-top {'active' if current_page_name == 'history' else ''}" 
+           title="History" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-history"></i>
+        </a>
+        <a href="/Maps" target="_self" class="nav-icon-top {'active' if current_page_name == 'maps' else ''}" 
+           title="Maps" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-map-marked-alt"></i>
+        </a>
+        <a href="/Profile" target="_self" class="nav-icon-top {'active' if current_page_name == 'profile' else ''}" 
+           title="Profile" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-user"></i>
+        </a>
+        <a href="/Settings" target="_self" class="nav-icon-top {'active' if current_page_name == 'settings' else ''}" 
+           title="Settings" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-cog"></i>
+        </a>
+    </div>
+</div>
+"""
+st.markdown(nav_html, unsafe_allow_html=True)
 
 # Initialize session state
 if 'user_preferences' not in st.session_state:

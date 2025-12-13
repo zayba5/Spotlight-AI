@@ -6,6 +6,8 @@ import os
 from datetime import datetime
 import requests
 from geopy.geocoders import Nominatim
+from storage import load_saved_places, save_saved_places
+
 
 def render_place_card(place):
     """
@@ -45,10 +47,14 @@ def render_place_card(place):
                     "notes": place.get("description", ""),
                 })
 
+                #important
+                save_saved_places(st.session_state.saved_places)
+
                 st.success(f"Saved {place_name}!")
 
                 # Optional: jump straight to History page
                 st.switch_page("pages/History.py")
+
 
             else:
                 st.info(f"{place_name} is already saved.")
@@ -60,7 +66,7 @@ def render_place_card(place):
 
 # Initialize saved places list
 if "saved_places" not in st.session_state:
-    st.session_state.saved_places = []
+    st.session_state.saved_places = load_saved_places()
 
 
 # Page config

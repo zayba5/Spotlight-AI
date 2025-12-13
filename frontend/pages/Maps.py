@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import os
 
 # Page config
 st.set_page_config(
@@ -9,8 +10,9 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom CSS
+# Top Navigation Bar (HTML + CSS) - Same as Homepage
 st.markdown("""
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
 
     /* --- REMOVE STREAMLIT DEFAULT TOP HEADER --- */
@@ -177,63 +179,112 @@ st.markdown("""
         margin-top: 0 !important;
     }
 
-    /* Result cards */
-    .result-card {
-        border: 1px solid #e0e0e0;
+    .saved-card {
+        border: 2px solid #667eea;
         border-radius: 12px;
         padding: 20px;
         margin: 15px 0;
-        background: white;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        transition: transform 0.2s;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
-    .result-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    .history-item {
+        border-left: 4px solid #667eea;
+        padding: 15px;
+        margin: 10px 0;
+        background: #f8f9fa;
+        border-radius: 0 8px 8px 0;
     }
-    .result-header {
-        font-size: 22px;
-        font-weight: bold;
-        color: #2c3e50;
-        margin-bottom: 8px;
-    }
-    .result-meta {
-        color: #7f8c8d;
-        font-size: 14px;
-        margin-bottom: 12px;
-    }
-    .badge {
+    .feedback-badge {
         display: inline-block;
-        padding: 4px 12px;
+        padding: 6px 12px;
         border-radius: 12px;
         font-size: 12px;
         margin-right: 8px;
-        margin-bottom: 8px;
     }
-    .badge-open {
+    .badge-liked {
         background: #d4edda;
         color: #155724;
     }
-    .badge-closed {
+    .badge-disliked {
         background: #f8d7da;
         color: #721c24;
     }
-    .badge-price {
-        background: #fff3cd;
-        color: #856404;
-    }
-    .badge-distance {
-        background: #d1ecf1;
-        color: #0c5460;
-    }
-    .filter-section {
-        background: #f8f9fa;
+    .stat-box {
+        background: white;
         padding: 1.5rem;
         border-radius: 10px;
-        margin-bottom: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        text-align: center;
     }
 </style>
 """, unsafe_allow_html=True)
+
+# Determine current page for highlighting
+current_file = os.path.basename(__file__)
+if current_file == "Homepage.py":
+    current_page_name = "homepage"
+elif current_file == "History.py":
+    current_page_name = "history"
+elif current_file == "Maps.py":
+    current_page_name = "maps"
+elif current_file == "Profile.py":
+    current_page_name = "profile"
+elif current_file == "Settings.py":
+    current_page_name = "settings"
+else:
+    current_page_name = current_file.replace(".py", "").lower()
+
+# Check query params for page navigation - MUST BE FIRST
+query_params = st.query_params
+if 'nav' in query_params:
+    nav_page = query_params['nav']
+    current_file_name = os.path.basename(__file__)
+    
+    if nav_page == 'homepage':
+        st.switch_page("../Homepage.py")
+    elif nav_page == 'history':
+        # Already on history page - clear the nav param
+        if 'nav' in st.query_params:
+            del st.query_params['nav']
+    elif nav_page == 'maps' and current_file_name != "Maps.py":
+        st.switch_page("Maps.py")
+    elif nav_page == 'profile' and current_file_name != "Profile.py":
+        st.switch_page("Profile.py")
+    elif nav_page == 'settings' and current_file_name != "Settings.py":
+        st.switch_page("Settings.py")
+
+# Top Navigation Bar with Icons - Using anchor tags for direct navigation
+nav_html = f"""
+<div class="custom-top-nav">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/No_image_available_600_x_450.svg">
+    <div class="search-wrapper">
+        <input type="text" placeholder="Search Spotlight AI...">
+    </div>
+    <div class="nav-icons-top">
+        <a href="/" target="_self" class="nav-icon-top {'active' if current_page_name == 'homepage' else ''}" 
+           title="Homepage" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-home"></i>
+        </a>
+        <a href="/History" target="_self" class="nav-icon-top {'active' if current_page_name == 'history' else ''}" 
+           title="History" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-history"></i>
+        </a>
+        <a href="/Maps" target="_self" class="nav-icon-top {'active' if current_page_name == 'maps' else ''}" 
+           title="Maps" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-map-marked-alt"></i>
+        </a>
+        <a href="/Profile" target="_self" class="nav-icon-top {'active' if current_page_name == 'profile' else ''}" 
+           title="Profile" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-user"></i>
+        </a>
+        <a href="/Settings" target="_self" class="nav-icon-top {'active' if current_page_name == 'settings' else ''}" 
+           title="Settings" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-cog"></i>
+        </a>
+    </div>
+</div>
+"""
+st.markdown(nav_html, unsafe_allow_html=True)
 
 # Initialize session state
 if 'search_results' not in st.session_state:
