@@ -7,6 +7,62 @@ from datetime import datetime
 import requests
 from geopy.geocoders import Nominatim
 
+def render_place_card(place):
+    """
+    Render a single interactive place card in Streamlit
+    """
+    st.markdown(f"""
+        <div class="place-card">
+            <div class="place-header">{place.get('name', place.get('title', 'Unknown'))}</div>
+            <div class="place-rating">⭐ {place.get('rating', '?')} ({place.get('reviews', place.get('review_count', '?'))} reviews)</div>
+            <p>{place.get('description', '')}</p>
+            <div class="citation">{place.get('citation', place.get('random_review', ''))}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Add two buttons side by side
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        place_name = place.get('name', place.get('title', 'Unknown'))
+
+        if st.button(
+            f"❤️ Save {place_name}",
+            key=f"save_{place_name}"
+        ):
+            already_saved = any(
+                p["name"] == place_name
+                for p in st.session_state.saved_places
+            )
+
+            if not already_saved:
+                st.session_state.saved_places.append({
+                    "name": place_name,
+                    "rating": place.get("rating", "?"),
+                    "price": place.get("price", "$$"),
+                    "category": place.get("category", "Restaurant"),
+                    "saved_date": datetime.now().strftime("%Y-%m-%d"),
+                    "visit_count": 0,          # REQUIRED by History.py
+                    "notes": place.get("description", ""),
+                })
+
+                st.success(f"Saved {place_name}!")
+
+                # Optional: jump straight to History page
+                st.switch_page("pages/History.py")
+
+            else:
+                st.info(f"{place_name} is already saved.")
+
+    with col2:
+        if st.button(f"🗺️ View on Map", key=f"map_{place.get('name', place.get('title', 'Unknown'))}"):
+            st.info(f"Opening map for {place.get('name', place.get('title', 'Unknown'))}…")
+
+
+# Initialize saved places list
+if "saved_places" not in st.session_state:
+    st.session_state.saved_places = []
+
+
 # Page config
 st.set_page_config(
     page_title="Spotlight AI - Chat",
@@ -429,20 +485,8 @@ for message in st.session_state.messages:
         # Display place cards if it's an assistant message with recommendations
         if message["role"] == "assistant" and "places" in message:
             for place in message["places"]:
-                st.markdown(f"""
-                <div class="place-card">
-                    <div class="place-header">{place['name']}</div>
-                    <div class="place-rating">⭐ {place['rating']} ({place['reviews']} reviews)</div>
-                    <p>{place['description']}</p>
-                    <div class="citation">💬 "{place['citation']}" - Review</div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Single action button: Save
-                if st.button(f"❤️ Save {place['name']}", key=f"save_{place['name']}"):
-                    if place['name'] not in st.session_state.user_preferences['liked_places']:
-                        st.session_state.user_preferences['liked_places'].append(place['name'])
-                        st.success(f"Saved {place['name']}!")
+                render_place_card(place)
+
 
 # Chat input
 placeholder_text = "Ask me about local places..."
@@ -603,63 +647,44 @@ if prompt:
 
 
             try:
-                # Send request to backend
                 response = requests.post(BACKEND_URL, json=payload, timeout=60)
 
                 if response.status_code != 200:
                     st.error(f"Backend error: {response.text}")
-                    assistant_answer = "Sorry, something went wrong with the server."
-                    places = []
+                    assistant_answer = ""
+                    citations = []
                 else:
                     data = response.json()
                     assistant_answer = data.get("answer", "")
                     citations = data.get("citations", [])
-                    places = []
 
-                    # Extract structured place info (if any). Each citation
-                    # now includes rating, review_count, and a random_review
-                    # snippet to display alongside the AI answer.
-                    for c in citations:
-                        title = c.get("title")
-                        if title:
-                            places.append({
-                                "name": title,
-                                "rating": c.get("rating", "?"),
-                                "reviews": c.get("review_count", "?"),
-                                # For now we don't have a richer summary field;
-                                # leave description empty or use random_review if desired.
-                                "description": "",
-                                # Show one random review (or snippet) beneath each card.
-                                "citation": c.get("random_review", "") or "",
-                            })
+                # Extract citations from backend response
+                places = []  # frontend expects "places"
 
-                # Display assistant text
-                st.markdown(assistant_answer)
+                if "citations" in data and isinstance(data["citations"], list):
+                    def clean_text(text):
+                        if not text:
+                            return ""
+                        return text.replace("***", "").strip()
 
-                # Immediately display place cards for this response,
-                # so the user sees them without needing another input.
-                for place in places:
-                    st.markdown(f"""
-                    <div class="place-card">
-                        <div class="place-header">{place['name']}</div>
-                        <div class="place-rating">⭐ {place['rating']} ({place['reviews']} reviews)</div>
-                        <p>{place['description']}</p>
-                        <div class="citation">💬 "{place['citation']}" - Review</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                for c in data["citations"]:
+                        places.append({
+                            "name": clean_text(c.get("title", "Unknown")),
+                            "rating": c.get("rating", "?"),
+                            "reviews": c.get("review_count", "?"),
+                            "description": clean_text(c.get("description", "")),
+                            "citation": clean_text(c.get("random_review", ""))
+                        })
 
-                    # Single action button: Save
-                    if st.button(f"❤️ Save {place['name']}", key=f"save_{place['name']}_inline"):
-                        if place['name'] not in st.session_state.user_preferences['liked_places']:
-                            st.session_state.user_preferences['liked_places'].append(place['name'])
-                            st.success(f"Saved {place['name']}!")
-
-                # Save assistant message (so cards re-render on future reruns)
+                # Add assistant message
                 st.session_state.messages.append({
                     "role": "assistant",
-                    "content": assistant_answer,
-                    "places": places
+                    "content": assistant_answer if len(places) == 0 else "",
+                    "places": places  # map citations to places so frontend renders cards
                 })
+
+
+                st.rerun()
 
             except Exception as e:
                 st.error(f"Unable to contact backend: {e}")

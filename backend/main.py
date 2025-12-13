@@ -1,5 +1,7 @@
 import os
 import random
+import re
+
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
@@ -512,17 +514,56 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
 			"random_review": random_review,
 		}
 
+	# Function to parse LLM text into structured citations
+	def parse_llm_output_to_citations(answer_text: str):
+		"""
+		Parse LLM output into structured citations.
+		Removes any leading *, •, - and whitespace from each line.
+		"""
+		citations = []
+		lines = [line.strip() for line in answer_text.splitlines() if line.strip()]
+		
+		for i, line in enumerate(lines):
+			# Skip obvious intro lines
+			if line.lower().startswith("based on") or line.lower().startswith("these suggestions"):
+				continue
+			
+			# Remove leading bullets/stars/dashes and any spaces following them
+			line = re.sub(r"^[\*\•\-]+\s*", "", line)
+
+			# Only parse lines with a colon
+			if ":" in line:
+				title, desc = line.split(":", 1)
+				# Skip lines where title is too long or clearly not a business
+				if len(title) > 100:
+					continue
+				citations.append({
+					"id": f"llm_{i}",
+					"title": title.strip(),
+					"rating": None,
+					"review_count": None,
+					"random_review": desc.strip(),
+				})
+		return citations
+
+
+
+	# Use retrieved_items if available; otherwise parse LLM text
+	if retrieved_items:
+		citations = [_to_citation(it) for it in retrieved_items]
+	else:
+		citations = parse_llm_output_to_citations(answer)
+
 	assistant_msg = models.Message(
 		conversation_id=conversation_id,
 		role="assistant",
 		content=answer,
-		citations=[_to_citation(it) for it in retrieved_items],
+		citations=citations,
 	)
 	db.add(user_msg)
 	db.add(assistant_msg)
 	db.commit()
 
-	citations = assistant_msg.citations or []
 	return ChatResponse(answer=answer, citations=citations, conversation_id=conversation_id)
 
 
