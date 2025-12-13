@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import pydeck as pdk
 from datetime import datetime
 import os
 
@@ -180,42 +179,60 @@ st.markdown("""
         margin-top: 0 !important;
     }
 
-    .saved-card {
-        border: 2px solid #667eea;
+    /* Result cards */
+    .result-card {
+        border: 1px solid #e0e0e0;
         border-radius: 12px;
         padding: 20px;
         margin: 15px 0;
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        background: white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        transition: transform 0.2s;
     }
-    .history-item {
-        border-left: 4px solid #667eea;
-        padding: 15px;
-        margin: 10px 0;
-        background: #f8f9fa;
-        border-radius: 0 8px 8px 0;
+    .result-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
-    .feedback-badge {
+    .result-header {
+        font-size: 22px;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 8px;
+    }
+    .result-meta {
+        color: #7f8c8d;
+        font-size: 14px;
+        margin-bottom: 12px;
+    }
+    .badge {
         display: inline-block;
-        padding: 6px 12px;
+        padding: 4px 12px;
         border-radius: 12px;
         font-size: 12px;
         margin-right: 8px;
+        margin-bottom: 8px;
     }
-    .badge-liked {
+    .badge-open {
         background: #d4edda;
         color: #155724;
     }
-    .badge-disliked {
+    .badge-closed {
         background: #f8d7da;
         color: #721c24;
     }
-    .stat-box {
-        background: white;
+    .badge-price {
+        background: #fff3cd;
+        color: #856404;
+    }
+    .badge-distance {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+    .filter-section {
+        background: #f8f9fa;
         padding: 1.5rem;
         border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        text-align: center;
+        margin-bottom: 1rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -447,23 +464,66 @@ with st.sidebar:
 # Main Content
 st.title("Search Results & Map View")
 
-# Search bar
-col1, col2 = st.columns([4, 1])
-with col1:
-    search_query = st.text_input(" Search for places", placeholder="e.g., coffee shops, Italian restaurants, bars...")
-with col2:
-    if st.button("Search", use_container_width=True, type="primary"):
-        st.info(f"Searching for: {search_query}")
-
 # Results summary
-filtered_results = [r for r in st.session_state.search_results if r['price'] in price_filter and r['rating'] >= min_rating]
+# Apply all filters
+filtered_results = st.session_state.search_results.copy()
+
+# Filter by price
+if price_filter:
+    filtered_results = [r for r in filtered_results if r['price'] in price_filter]
+
+# Filter by rating
+filtered_results = [r for r in filtered_results if r['rating'] >= min_rating]
+
+# Filter by categories
+if categories:
+    filtered_results = [r for r in filtered_results if r['category'] in categories]
+
+# Filter by distance
+filtered_results = [r for r in filtered_results if r['distance'] <= distance_radius]
+
+# Filter by open now
 if open_now:
     filtered_results = [r for r in filtered_results if r['open_now']]
+
+# Apply sorting
+if sort_by == "Distance":
+    filtered_results = sorted(filtered_results, key=lambda x: x['distance'])
+elif sort_by == "Rating":
+    filtered_results = sorted(filtered_results, key=lambda x: x['rating'], reverse=True)
+elif sort_by == "Reviews":
+    filtered_results = sorted(filtered_results, key=lambda x: x['reviews'], reverse=True)
+elif sort_by == "Price (Low to High)":
+    price_order = {"$": 1, "$$": 2, "$$$": 3, "$$$$": 4}
+    filtered_results = sorted(filtered_results, key=lambda x: price_order.get(x['price'], 5))
+elif sort_by == "Price (High to Low)":
+    price_order = {"$": 1, "$$": 2, "$$$": 3, "$$$$": 4}
+    filtered_results = sorted(filtered_results, key=lambda x: price_order.get(x['price'], 5), reverse=True)
 
 st.markdown(f"### Found {len(filtered_results)} places within {distance_radius} miles")
 
 # View toggle
-view_mode = st.radio("View Mode:", ["List View", "Map View", "Split View"], horizontal=True)
+view_mode = st.radio("View Mode:", ["List View", "Map View"], horizontal=True)
+
+# Helper function to prepare map data
+def prepare_map_data(results):
+    """Convert results to DataFrame format for st.map()"""
+    if not results:
+        return pd.DataFrame()
+    
+    map_data = []
+    for result in results:
+        map_data.append({
+            "lat": result["lat"],
+            "lon": result["lng"],  # st.map uses 'lon' not 'lng'
+            "name": result["name"],
+            "rating": result["rating"],
+            "reviews": result["reviews"],
+            "price": result["price"],
+            "distance": result["distance"]
+        })
+    
+    return pd.DataFrame(map_data)
 
 if view_mode == "List View":
     # List view only
@@ -512,42 +572,6 @@ if view_mode == "List View":
                     st.info("Phone: (408) 555-0123")
 
 elif view_mode == "Map View":
-    # Map view only
-    df = pd.DataFrame(filtered_results)
-    
-    # Create PyDeck map
-    view_state = pdk.ViewState(
-        latitude=37.3382,
-        longitude=-121.8863,
-        zoom=13,
-        pitch=0
-    )
-    
-    layer = pdk.Layer(
-        "ScatterplotLayer",
-        data=df,
-        get_position=["lng", "lat"],
-        get_color="[102, 126, 234, 200]",
-        get_radius=100,
-        pickable=True,
-    )
-    
-    tooltip = {
-        "html": "<b>{name}</b><br/>★ {rating} ({reviews} reviews)<br/>📍 {distance} mi<br/>{price}",
-        "style": {"backgroundColor": "steelblue", "color": "white"}
-    }
-    
-    st.pydeck_chart(pdk.Deck(
-        layers=[layer],
-        initial_view_state=view_state,
-        tooltip=tooltip,
-        map_style="mapbox://styles/mapbox/light-v9",
-        height=600
-    ))
-    
-    
-
-else:  # Split View
     col1, col2 = st.columns([1, 1])
     
     with col1:
@@ -561,40 +585,33 @@ else:  # Split View
             </div>
             """, unsafe_allow_html=True)
             
+            # Initialize expander state for this place
+            expander_key = f"expander_{result['name']}"
+            if expander_key not in st.session_state:
+                st.session_state[expander_key] = False
+            
+            # Toggle expander state when button is clicked
             if st.button(f"View Details", key=f"split_view_{result['name']}"):
-                st.info(f"Opening {result['name']}")
+                st.session_state[expander_key] = not st.session_state[expander_key]
+            
+            # Show expander based on state
+            if st.session_state[expander_key]:
+                with st.expander(f"Details for {result['name']}", expanded=True):
+                    st.markdown(f"**Address:** {result.get('address', 'N/A')}")
+                    st.markdown("---")
+                    st.markdown(f"**Details:**")
+                    st.markdown(f"{result.get('description', 'No description available.')}")
+                    st.markdown("---")
+                    st.markdown(f"**Phone Number:** {result.get('phone', 'N/A')}")
     
     with col2:
         st.markdown("### Map")
-        df = pd.DataFrame(filtered_results)
+        map_df = prepare_map_data(filtered_results)
         
-        view_state = pdk.ViewState(
-            latitude=37.3382,
-            longitude=-121.8863,
-            zoom=13,
-            pitch=0
-        )
-        
-        layer = pdk.Layer(
-            "ScatterplotLayer",
-            data=df,
-            get_position=["lng", "lat"],
-            get_color="[102, 126, 234, 200]",
-            get_radius=100,
-            pickable=True,
-        )
-        
-        tooltip = {
-            "html": "<b>{name}</b><br/>★ {rating}<br/>{price}",
-            "style": {"backgroundColor": "steelblue", "color": "white"}
-        }
-        
-        st.pydeck_chart(pdk.Deck(
-            layers=[layer],
-            initial_view_state=view_state,
-            tooltip=tooltip,
-            map_style="mapbox://styles/mapbox/light-v9",
-            height=500
-        ))
+        if not map_df.empty:
+            st.map(map_df, zoom=13)
+        else:
+            st.info("No places to display on the map.")
+
 
 
