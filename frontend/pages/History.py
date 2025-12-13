@@ -350,35 +350,8 @@ if 'user_preferences' not in st.session_state:
     }
 
 if 'saved_places' not in st.session_state:
-    st.session_state.saved_places = [
-        {
-            'name': 'Blue Bottle Coffee',
-            'rating': 4.5,
-            'price': '$$',
-            'category': 'Coffee & Tea',
-            'saved_date': '2025-11-10',
-            'visit_count': 3,
-            'notes': 'Fast WiFi, has outlets!'
-        },
-        {
-            'name': 'Cafe Frascati',
-            'rating': 4.3,
-            'price': '$$',
-            'category': 'Coffee & Tea',
-            'saved_date': '2025-11-08',
-            'visit_count': 2,
-            'notes': 'Love the outdoor seating.'
-        },
-        {
-            'name': 'Philz Coffee',
-            'rating': 4.6,
-            'price': '$',
-            'category': 'Coffee & Tea',
-            'saved_date': '2025-11-05',
-            'visit_count': 5,
-            'notes': 'Best customized coffee blends!'
-        }
-    ]
+    st.session_state.saved_places = []
+
 
 # Page Header
 st.title("History & Saved Places")
@@ -413,7 +386,7 @@ with col3:
     """, unsafe_allow_html=True)
 
 with col4:
-    total_visits = sum([place['visit_count'] for place in st.session_state.saved_places])
+    total_visits = sum(place.get('visit_count', 0) for place in st.session_state.saved_places)
     st.markdown("""
     <div class="stat-box">
         <h2 style="color: #f44336; margin: 0;">""" + str(total_visits) + """</h2>
