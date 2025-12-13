@@ -142,8 +142,9 @@ st.markdown("""
     }
 
     [data-testid="stSidebar"] {
-        padding-top: 0 !important;
-        margin-top: 30px !important;
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
     }
 
     /* Hide Streamlit's automatic sidebar navigation */
@@ -171,6 +172,9 @@ st.markdown("""
     .main .block-container {
         padding-top: 0 !important;
         margin-top: 0 !important;
+        max-width: 100% !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
     }
 
     /* --- THE MISSING RULE (this one fixes your last gap!!) --- */
